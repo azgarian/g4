@@ -1,0 +1,9 @@
+# Example conda environment file
+# Create environment files for your tools here
+
+name: snakemake_example_env
+dependencies:
+  - snakemake-minimal
+  - snakemake-executor-plugin-cluster-generic
+
+  # Add your tool dependencies here

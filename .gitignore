@@ -1,0 +1,9 @@
+results/*
+
+logs/*
+!logs/cluster/
+logs/cluster/*
+!logs/cluster/readme.md
+
+.snakemake/*
+.DS_Store

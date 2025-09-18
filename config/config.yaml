@@ -1,0 +1,12 @@
+# Minimal Snakemake configuration
+# Add your project-specific configuration here
+
+# Example sample configuration
+samples:
+  - "sample_odd"
+  - "sample_even"
+
+# Example parameters
+params:
+  threads: 4
+  memory: "8G"
