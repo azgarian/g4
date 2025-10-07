@@ -26,6 +26,7 @@ cluster-generic-submit-cmd: "sbatch -A {resources.account} -p {resources.partiti
 software-deployment-method: "conda"
 # Use mamba as the conda frontend for faster solves (uncomment to enable)
 # conda-frontend: "mamba"
+scheduler: "greedy"
 
 # Print the shell commands that are executed
 printshellcmds: True
@@ -39,7 +40,7 @@ rerun-triggers: "mtime"
 # Default resources for all jobs
 # Adjust account and partition according to your HPC setup.
 # These values feed the placeholders used in the submit command above.
-default-resources: [account='mdbf', partition='short_mdbf']
+default-resources: [account='users', partition='mem']
 
 # Optional: Set specific resources for certain rules (overrides defaults)
 # Format matches CLI `--set-resources`. Examples:

@@ -18,55 +18,27 @@ wildcard_constraints:
 # Final targets for this workflow; dependencies are inferred from inputs/outputs
 rule all:
     input:
-        # Use wildcards to reference all per-sample final outputs
-        expand("results/{sample}_number_of_lines.txt", sample=config["samples"]),
-        expand("results/{sample}_length.txt", sample=config["samples"])
+        expand("results/master/{region}/mapped_all.csv", region=config["region_names"]),
+        expand("results/g4_repair/{region}/{region}_64_normalized.png",
+            region=[r for r in config["region_names"] if "oqs" in r]),
+        # expand("results/deeptools/{region}_atac/profile.pdf", region=["oqs_0", "oqs_12", "oqs_30", "oqs_60", "oqs_lost_after_uv", "oqs_formed_after_uv", "oqs_persistent", "oqs_never_formed", "oqs_cur_alg"]),
+        # expand("results/g4_miner/{region}.promoter_info.tsv", region=["oqs_0", "oqs_12", "oqs_30", "oqs_60"]),
+        "results/g4_txn/g4_promoter_counts.tsv",
+        # "resources/Hela_15m_R3_ATAC_AGGCAGAA-TATCCTCT_S2.shifted.bw",
+        # "resources/Hela_1h_R3_ATAC.shifted.bw",
+        # "resources/Hela_1m_R3_ATAC_AGGCAGAA-CTCTCTAT_S3.shifted.bw",
+        # "resources/Hela_30m_R3_ATAC.shifted.bw",
+        # "resources/Hela_4h_R3_ATAC_TCCTGAGC-CTCTCTAT_S4.shifted.bw",
+        # "resources/Hela_8h_R3_ATAC_TCCTGAGC-TATCCTCT_S6.shifted.bw",
+        # "resources/HelanoUV_R1_ATAC_TAAGGCGA-TAGATCGC_S7.shifted.bw",
 
-# You can either include a rule file/s or define the rule/s directly here
-# For larger projects, prefer modular rule files under workflow/rules/
 
-## Include your rule files here
-## include: "workflow/rules/example_rules.smk"
+include: "workflow/rules/mapping.smk"
 
-## Example rule - replace with your actual rules
-# Produce a simple per-sample artifact (placeholder for your first step)
-rule example_rule:
-    output:
-        "results/{sample}_raw.txt"
-    log:
-        "logs/example_rule_{sample}.log"
-    benchmark:
-        "logs/example_rule_{sample}.benchmark.log"
-    shell:
-        """
-        (echo 'Hello from Snakemake on HPC! \nCurrent sample is {wildcards.sample}' \
-        > {output}) &> {log}
-        """
+# deepTools rules
+include: "workflow/rules/deeptools.smk"
 
-# Derive a basic metric from the raw artifact (illustrative second step)
-rule example_rule2:
-    input:
-        "results/{sample}_raw.txt"
-    output:
-        "results/{sample}_number_of_lines.txt"
-    log:
-        "logs/example_rule2_{sample}.log"
-    benchmark:
-        "logs/example_rule2_{sample}.benchmark.log"
-    shell:
-        "(wc -l {input} > {output}) &> {log}"
-
-# Compute a simple property using a helper in params (demonstrates params usage)
-rule example_rule3:
-    input:
-        "results/{sample}_raw.txt"
-    output:
-        "results/{sample}_length.txt"
-    log:
-        "logs/example_rule3_{sample}.log"
-    benchmark:
-        "logs/example_rule3_{sample}.benchmark.log"
-    params:
-        is_odd = lambda wildcards, input: is_odd(str(input[0]))
-    shell:
-        "(echo 'Length of {input} is {params.is_odd}' > {output}) &> {log}"
+# G4 transcription analysis rules
+include: "workflow/rules/g4_txn.smk"
+include: "workflow/rules/g4_promoters.smk"
+include: "workflow/rules/g4_repair.smk"

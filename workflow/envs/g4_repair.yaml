@@ -1,0 +1,13 @@
+name: g4_repair
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - pandas
+  - numpy
+  - matplotlib
+  - seaborn
+
+

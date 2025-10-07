@@ -1,0 +1,12 @@
+name: g4_txn
+channels: [conda-forge, bioconda]
+dependencies:
+  - python>=3.10
+  - bioframe>=0.6
+  - pandas
+  - numpy
+  - matplotlib
+  - scipy
+  - rpy2  # optional, only if you want --tmm
+  - r-base  # optional
+  - bioconductor-edger # optional

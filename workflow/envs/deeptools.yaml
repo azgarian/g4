@@ -1,0 +1,12 @@
+name: deeptools
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - deeptools >=3.5
+  - numpy
+  - pandas
+  - matplotlib
+

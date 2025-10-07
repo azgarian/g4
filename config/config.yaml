@@ -1,12 +1,166 @@
-# Minimal Snakemake configuration
-# Add your project-specific configuration here
 
-# Example sample configuration
+
 samples:
-  - "sample_odd"
-  - "sample_even"
+  HXA64A1_ATCACG_hg38_XR:
+    method: XR
+    cell: Hela
+    product: 64-PP
+    time_after_exposure: 12
+    name: HX64_12_rep1
+  HXA64B7_CAGATC_hg38_XR:
+    method: XR
+    cell: Hela
+    product: 64-PP
+    time_after_exposure: 12
+    name: HX64_12_rep2
+  HXACA4_TGACCA_hg38_XR:
+    method: XR
+    cell: Hela
+    product: CPD
+    time_after_exposure: 12
+    name: HXC_12_rep1
+  HXACB10_TAGCTT_hg38_XR:
+    method: XR
+    cell: Hela
+    product: CPD
+    time_after_exposure: 12
+    name: HXC_12_rep2
+  HDA64A1_ATCACG_hg38_DS:
+    method: DS
+    cell: Hela
+    product: 64-PP
+    time_after_exposure: 0
+    name: HD64_0_rep1
+  HDA64B19_GTGAAA_hg38_DS:
+    method: DS
+    cell: Hela
+    product: 64-PP
+    time_after_exposure: 0
+    name: HD64_0_rep2
+  HDACA6_GCCAAT_hg38_DS:
+    method: DS
+    cell: Hela
+    product: CPD
+    time_after_exposure: 0
+    name: HDC_0_rep1
+  HDACB23_GAGTGG_hg38_DS:
+    method: DS
+    cell: Hela
+    product: CPD
+    time_after_exposure: 0
+    name: HDC_0_rep2
+  R3Hela_1m64_CGATGT_S5_hg38_DS:
+    method: DS
+    cell: Hela
+    product: 64-PP
+    time_after_exposure: 0
+    name: HD64_0_rep3
+  R3Hela_1mCPD_GATCAG_S6_hg38_DS:
+    method: DS
+    cell: Hela
+    product: CPD
+    time_after_exposure: 0
+    name: HDC_0_rep3
+  R3Hela_15m64_TTAGGC_S1_hg38_DS:
+    method: DS
+    cell: Hela
+    product: 64-PP
+    time_after_exposure: 15
+    name: HD64_15_rep1
+  R3Hela_15mCPD_TAGCTT_S2_hg38_DS:
+    method: DS
+    cell: Hela
+    product: CPD
+    time_after_exposure: 15
+    name: HDC_15_rep1
+  R3Hela_30m64_TGACCA_S7_hg38_DS:
+    method: DS
+    cell: Hela
+    product: 64-PP
+    time_after_exposure: 30
+    name: HD64_30_rep2
+  R3Hela_30mCPD_GGCTAC_S8_hg38_DS:
+    method: DS
+    cell: Hela
+    product: CPD
+    time_after_exposure: 30
+    name: HDC_30_rep2
+  R3Hela_1h64_ACAGTG_S3_hg38_DS:
+    method: DS
+    cell: Hela
+    product: 64-PP
+    time_after_exposure: 60
+    name: HD64_60_rep2
+  R3Hela_1hCPD_CTTGTA_S4_hg38_DS:
+    method: DS
+    cell: Hela
+    product: CPD
+    time_after_exposure: 60
+    name: HDC_60_rep2
+  R3Hela_4h64_GCCAAT_S9_hg38_DS:
+    method: DS
+    cell: Hela
+    product: 64-PP
+    time_after_exposure: 240
+    name: HD64_240_rep1
+  R3Hela_4hCPD_AGTCAA_S10_hg38_DS:
+    method: DS
+    cell: Hela
+    product: CPD
+    time_after_exposure: 240
+    name: HDC_240_rep1
+  R3Hela_8h64_CAGATC_S11_hg38_DS:
+    method: DS
+    cell: Hela
+    product: 64-PP
+    time_after_exposure: 480
+    name: HD64_480_rep1
+  R3Hela_8hCPD_AGTTCC_S12_hg38_DS:
+    method: DS
+    cell: Hela
+    product: CPD
+    time_after_exposure: 480
+    name: HDC_480_rep1
 
-# Example parameters
-params:
-  threads: 4
-  memory: "8G"
+
+region_names:
+  - "oqs_0_11_10"
+  - "oqs_0_101_10"
+  - "oqs_0_101_50"
+  - "oqs_0_101_100"
+  - "oqs_12_11_10"
+  - "oqs_12_101_10"
+  - "oqs_12_101_50"
+  - "oqs_12_101_100"
+  - "oqs_30_11_10"
+  - "oqs_30_101_10"
+  - "oqs_30_101_50"
+  - "oqs_30_101_100"
+  - "oqs_60_11_10"
+  - "oqs_60_101_10"
+  - "oqs_60_101_50"
+  - "oqs_60_101_100"
+  - "oqs_lost_after_uv_11_10"
+  - "oqs_lost_after_uv_101_10"
+  - "oqs_lost_after_uv_101_50"
+  - "oqs_lost_after_uv_101_100"
+  - "oqs_formed_after_uv_11_10"
+  - "oqs_formed_after_uv_101_10"
+  - "oqs_formed_after_uv_101_50"
+  - "oqs_formed_after_uv_101_100"
+  - "oqs_persistent_11_10"
+  - "oqs_persistent_101_10"
+  - "oqs_persistent_101_50"
+  - "oqs_persistent_101_100"
+  - "oqs_never_formed_11_10"
+  - "oqs_never_formed_101_10"
+  - "oqs_never_formed_101_50"
+  - "oqs_never_formed_101_100"
+  - "oqs_cur_alg_101_100"
+  - "tss_11_10"
+  - "tss_101_10"
+  - "tss_101_50"
+  - "tss_101_100"
+  - "tss_201_100"
+
+
