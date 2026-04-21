@@ -1,8 +1,60 @@
-# G4 Pipeline (Reduced Spin-Off)
+# G-Quadruplex UV-Response Pipeline
 
-This repository contains a smaller, restart-from-scratch version of the original g-quadruplex pipeline. The overall goal is the same: collect G4-related loci from several sources, place everything on a common `hg38` coordinate system, and generate structure-aware outputs that can be compared downstream. The difference is that this branch currently works with a much smaller set of inputs and a narrower active workflow.
+## Project Overview
 
-The resource layout is intentionally kept close to the original project. Reference files live under `resources/ref_genomes/`, sample-level inputs live under `resources/samples/`, workflow rules live under `workflow/rules/`, and final outputs are written to `results/`.
+G-quadruplexes (G4s) are non-canonical nucleic acid structures formed by stacked guanine tetrads. They are enriched in regulatory and structurally important parts of the genome, where they can influence transcription, replication, chromatin state, and genome stability. At the same time, the field still lacks a single method that can robustly capture the full diversity of in vivo G4 states across conditions. Sequence-based callers detect potential G4-forming loci, but they do not prove formation in cells. Experimental assays identify formed structures more directly, but each assay has its own binding or protocol biases. This becomes an even larger problem when the goal is to study dynamic G4 behavior after stress rather than static G4 presence at baseline.
+
+This project addresses that gap by building an active Snakemake workflow that integrates orthogonal G4 datasets with UV damage, UV repair, chromatin accessibility, RNA signal, histone ChIP-seq, TF ChIP-seq, and genomic annotation resources. The main biological goal is to understand the interplay between UV damage, UV repair, G4 formation, and regulatory context after UV exposure. In practice, the key limitation is that we do not have a direct G4 ChIP-seq or CUT&Tag time series after UV. Because of that, the workflow first infers a time-resolved G4 layer from the Hi-C/G4-Miner branch and then interprets those inferred G4 dynamics against lesion, repair, and regulatory datasets. This means both parts of the project are essential: the method-oriented branch is needed to produce a credible UV time-series G4 landscape, and the analysis-oriented branches are needed to test how that landscape relates to damage accumulation, repair behavior, and gene regulation after UV.
+
+## Active Datasets
+
+The tables below list the dataset families that are actively consumed by the current workflow. They are limited to live inputs used by uncommented modules in [`workflow/Snakefile`](workflow/Snakefile).
+
+### Reference and genome resources
+
+| Dataset family | Assay / source | Active conditions | Role in pipeline | Where defined |
+| --- | --- | --- | --- | --- |
+| Reference genome | hg38 primary assembly | hg38 only | Core reference for alignment, sequence extraction, structure annotation, and interval generation | [`config/config.yaml`](config/config.yaml) |
+| Gene annotation | Gencode v48 GTF | hg38 only | Promoter/TSS annotation and gene-context analyses | [`config/config.yaml`](config/config.yaml) |
+| RNA-seq gene annotation | Gencode v35 GTF | hg38 only | Transcript-to-gene mapping and gene-level annotation for the active RNA-seq time-series branch | [`config/config.yaml`](config/config.yaml), [`workflow/rules/rnaseq.smk`](workflow/rules/rnaseq.smk) |
+| ENCODE blacklist | ENCODE blacklist BED | hg38 only | Removes problematic genomic regions before downstream analyses | [`config/config.yaml`](config/config.yaml) |
+| Repeat annotations | UCSC RepeatMasker table | hg38 only | Reference annotation used by active genome-prep resources | [`config/config.yaml`](config/config.yaml) |
+| Mappability track | Umap/Bismap k50 BED | hg38 only | Reference resource prepared for active genome context support | [`config/config.yaml`](config/config.yaml) |
+| LiftOver chain | hg19-to-hg38 chain | hg19 to hg38 | Required to lift observed quadruplex tracks into the active genome build | [`config/config.yaml`](config/config.yaml) |
+
+### G4 and PQS reference datasets
+
+| Dataset family | Assay / source | Active conditions | Role in pipeline | Where defined |
+| --- | --- | --- | --- | --- |
+| OQS, K-stabilized | GEO observed quadruplex BEDs | plus/minus strand, K condition | Orthogonal G4 support set used to judge whether inferred UV-responsive loci overlap experimentally observed quadruplex-rich regions | [`config/config.yaml`](config/config.yaml) |
+| OQS, PDS-stabilized | GEO observed quadruplex BEDs | plus/minus strand, PDS condition | Orthogonal G4 support set used to test whether inferred UV-responsive loci remain consistent with an independent observed quadruplex condition | [`config/config.yaml`](config/config.yaml) |
+| GC-rich background | Genome-derived sampled BED | structure-supported GC-rich non-OQS loci | Baseline/background comparison set used to test whether inferred mG4 behavior exceeds generic GC-rich sequence context | [`workflow/rules/gc_rich_bg.smk`](workflow/rules/gc_rich_bg.smk) |
+
+### Experimental G4 discovery datasets
+
+| Dataset family | Assay / source | Active conditions | Role in pipeline | Where defined |
+| --- | --- | --- | --- | --- |
+| G4 ChIP-seq | local paired FASTQs | HeLa, hg38 | Orthogonal experimental G4 support set used to evaluate robustness of inferred loci against assay-based G4 mapping | [`workflow/rules/g4p_chip_seq.smk`](workflow/rules/g4p_chip_seq.smk) |
+| G4 CUT&Tag | local paired FASTQs | HeLa, hg38 | Orthogonal experimental G4 support set used to evaluate robustness of inferred loci against an independent assay chemistry | [`workflow/rules/g4p_cut_tag.smk`](workflow/rules/g4p_cut_tag.smk) |
+
+### UV damage and repair datasets
+
+| Dataset family | Assay / source | Active conditions | Role in pipeline | Where defined |
+| --- | --- | --- | --- | --- |
+| XR-seq style repair inputs | HeLa XR samples | `64-PP` and `CPD`, active time `12` min | Repair layer used to test how inferred UV-responsive G4 states relate to repair signal after UV | [`config/config.yaml`](config/config.yaml) |
+| Damage-seq style lesion inputs | HeLa DS samples | `64-PP` and `CPD`, active times `0`, `1`, `15`, `30`, `60`, `240`, `480` min | Damage layer used to test how inferred UV-responsive G4 states relate to lesion accumulation through time | [`config/config.yaml`](config/config.yaml) |
+| Simulated UV controls | simulated BED/BW tracks paired with XR/DS inputs | matched to active XR/DS samples | Null or background reference for real-vs-sim damage profile comparisons | generated in active UV damage workflows |
+
+### Chromatin and expression context datasets
+
+| Dataset family | Assay / source | Active conditions | Role in pipeline | Where defined |
+| --- | --- | --- | --- | --- |
+| ATAC-seq bigWigs | local pooled coverage bigWigs | noUV, `15m`, `30m`, `1h` | Regulatory-context layer used to test whether UV-responsive G4 groups occupy different accessibility states across the UV response | [`workflow/rules/fate_groups.smk`](workflow/rules/fate_groups.smk), [`workflow/rules/timepoints.smk`](workflow/rules/timepoints.smk), [`workflow/rules/validate_mg4.smk`](workflow/rules/validate_mg4.smk) |
+| RNA-seq bigWig | baseline merged RNA-seq signal | `merged_t00.bw` | Regulatory-context layer used to place inferred G4 loci relative to baseline transcriptional activity | [`workflow/rules/fate_groups.smk`](workflow/rules/fate_groups.smk), [`workflow/rules/timepoints.smk`](workflow/rules/timepoints.smk), [`workflow/rules/validate_mg4.smk`](workflow/rules/validate_mg4.smk) |
+| RNA-seq Salmon quantifications | local Salmon `quant.sf` directories | `0`, `12`, `30`, `60` minutes with discovered matching replicates | Transcriptome-wide expression time series used for tximport, DESeq2 likelihood-ratio testing, and RNA-seq QC across the UV response | [`config/config.yaml`](config/config.yaml), [`workflow/rules/rnaseq.smk`](workflow/rules/rnaseq.smk) |
+| Histone ChIP-seq bigWigs | ENCODE HeLa-S3 released fold-change bigWigs | resolved active manifest tracks | Regulatory chromatin layer used to ask whether UV-responsive or damage-sensitive G4 groups occupy distinct chromatin environments | [`resources/HELA_S3/HeLa_S3_histones.tsv`](resources/HELA_S3/HeLa_S3_histones.tsv), [`workflow/rules/histone_profiles.smk`](workflow/rules/histone_profiles.smk) |
+| TF ChIP-seq peak BEDs | ENCODE HeLa-S3 released IDR thresholded peaks | resolved active manifest tracks | Regulatory occupancy layer used to ask whether UV-responsive or external-support G4 groups align with distinct TF-associated contexts | [`resources/HELA_S3/HeLa_S3_tfs.tsv`](resources/HELA_S3/HeLa_S3_tfs.tsv), [`workflow/rules/tf_profiles.smk`](workflow/rules/tf_profiles.smk) |
+| HeLa-S3 ChIP peak catalogs | ENCODE HeLa-S3 released TF and histone IDR thresholded peak BEDs | resolved active manifest tracks | Catalog layer used for grouped G4 peak-enrichment summaries, multi-track colocalization analyses, and peak-centered G4 occupancy profiling | [`config/config.yaml`](config/config.yaml), [`workflow/rules/chip_peak_g4_enrichment.smk`](workflow/rules/chip_peak_g4_enrichment.smk) |
 
 ## What is active in this branch
 
