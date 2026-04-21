@@ -1,6 +1,6 @@
 GC_RICH_BG_TILE_SIZE = 150
 GC_RICH_BG_GC_THRESHOLD = 0.28
-GC_RICH_BG_SAMPLE_SIZE = 20000
+GC_RICH_BG_SAMPLE_SIZE = 40000
 GC_RICH_BG_SEED = 42
 GC_RICH_BG_MIN_PREPARED = 7000
 
@@ -13,8 +13,8 @@ rule gc_rich_bg_select:
         oqs_k_bed="results/oqs/oqs_K_prepared.bed",
         oqs_pds_bed="results/oqs/oqs_PDS_prepared.bed",
     output:
-        sampled_bed="results/gc_rich_bg/gc_rich_bg_300k_sampled.bed",
-        sampled_no_oqs_bed="results/gc_rich_bg/gc_rich_bg_300k_sampled_no_oqs.bed",
+        sampled_bed="results/gc_rich_bg/gc_rich_bg_sampled.bed",
+        sampled_no_oqs_bed="results/gc_rich_bg/gc_rich_bg_sampled_no_oqs.bed",
         summary_tsv="results/gc_rich_bg/gc_rich_bg_selection_summary.tsv",
     log:
         "logs/gc_rich_bg/gc_rich_bg_select.log",
