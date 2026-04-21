@@ -1,0 +1,17 @@
+name: python
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - conda-forge::matplotlib ==3.6.2
+  - conda-forge::python_abi ==3.10
+  - conda-forge::pandas ==1.5.2
+  - conda-forge::seaborn ==0.11.2
+  - conda-forge::numpy ==1.24
+  - conda-forge::scipy
+  - conda-forge::statsmodels
+  - bioconda::bedtools
+  - conda-forge::biopython ==1.81
+  - bioconda::pybigwig
+  - bioconda::ucsc-bigwigaverageoverbed

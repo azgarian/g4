@@ -5,31 +5,25 @@ import warnings
 
 ################### Helper Functions ###########################################
 
-def get_sample_files(wildcards):
-    """
-    Example helper function to get sample files.
-    Modify according to your needs.
-    """
-    return config["samples"][wildcards.sample]
+def allInput():
 
-def get_all_samples():
-    """
-    Get all sample names from config.
-    """
-    return list(config["samples"].keys())
+    inputList = []
 
-def is_odd(file):
-    """
-    Example helper function to check if a sample length is odd.
-    Modify according to your needs.
-    """
+    # smk: g4p_cut_tag
+    inputList.append("results/g4cuttag/g4_hela_peaks_prepared.bed")
 
-    with open(file, "r") as f:
-        length = len(f.read())
-    
-    if length % 2 == 1:
-        return "odd"
-    else:
-        return "even"
+    # smk: g4p_chip_seq
+    inputList.append("results/g4chip/g4_hela_peaks_prepared.bed")
 
-# Add your common functions here
+    # smk: g4chip_g4cuttag_merge
+    inputList.append("results/g4chip_g4cuttag/g4_hela_chip_cuttag_merged.bed")
+
+    # smk: prepare_oqs
+    inputList.append("results/oqs/oqs_K_prepared.bed")
+    inputList.append("results/oqs/oqs_PDS_prepared.bed")
+
+    # smk: gc_rich_bg
+    inputList.append("results/gc_rich_bg/gc_rich_bg_prepared.bed")
+    inputList.append("results/gc_rich_bg/gc_rich_bg_selection_summary.tsv")
+
+    return inputList

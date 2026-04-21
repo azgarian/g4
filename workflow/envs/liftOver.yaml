@@ -1,0 +1,3 @@
+name: liftOver
+dependencies:
+  - bioconda::ucsc-liftover

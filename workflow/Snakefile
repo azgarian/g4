@@ -1,0 +1,23 @@
+#!/bin/env python
+
+#### configuration file ####
+configfile: "config/config.yaml"
+
+include: "rules/common.smk"
+
+wildcard_constraints:
+    oqs_name="|".join(config["oqs"].keys()),
+
+rule all:
+    input:
+        lambda w: allInput(),
+
+# Downloading reference genome and generating related files
+include: "rules/prepare_genome.smk"
+
+# Generate G4 regions with different methodologies
+include: "rules/prepare_oqs.smk"  # Prepare OQS regions
+include: "rules/gc_rich_bg.smk"  # Prepare GC-rich genome background
+include: "rules/g4p_chip_seq.smk"  # g4chip peaks from FASTQ
+include: "rules/g4p_cut_tag.smk"  # g4cuttag peaks from FASTQ
+include: "rules/g4chip_g4cuttag_merge.smk"  # Merge g4chip and g4cuttag intervals

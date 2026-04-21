@@ -1,4 +1,86 @@
+genome:
+  build: "hg38"
+  link: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_48/GRCh38.primary_assembly.genome.fa.gz"
+  gtf_url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_48/gencode.v48.annotation.gtf.gz"
+  blacklist_url: "https://www.encodeproject.org/files/ENCFF356LFX/@@download/ENCFF356LFX.bed.gz"
+  repeatmasker_url: "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/rmsk.txt.gz"
+  mappability_url: "https://bismap.hoffmanlab.org/raw/hg38/k50.umap.bed.gz"
+  liftOver_chain_url: "https://hgdownload.soe.ucsc.edu/gbdb/hg19/liftOver/hg19ToHg38.over.chain.gz"
 
+rna_seq:
+  salmon_dir: "resources/rna-seq"
+  sample_regex: "^SU_(?P<rep>[123])(?P<time>00|12|30|60)$"
+  time_order: ["0", "12", "30", "60"]
+  prefilter_min_count: 10
+  prefilter_min_samples: 3
+  alpha: 0.05
+  annotation_dir: "resources/ref_genomes/hg38_rnaseq_v35"
+  gencode_v35_gtf_url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_35/gencode.v35.annotation.gtf.gz"
+
+rna_seq_g4:
+  promoter_upstream_bp: 2000
+  promoter_downstream_bp: 100
+  alpha: 0.05
+  background_padj_min: 0.5
+  deg_source: "omnibus_lrt"
+  tested_gene_universe: true
+
+rna_seq_coseq:
+  k_range: "5:15"
+  input_matrix: "normalized_counts"
+  model: "Normal"
+  transformation: "arcsin"
+  norm_factors: "none"
+  seed: 12345
+  nstart: 25
+  iter_max: 100
+  posterior_min: 0.9
+
+rna_seq_g4_direction:
+  effect_size_thresholds: [0.5, 1.0, 1.5]
+  min_genes_for_model: 100
+  min_deg_for_sign_model: 30
+  cluster_min_high_conf_genes: 50
+
+rna_seq_g4_context:
+  genesets_dir: "resources/genesets/dna_repair/sets"
+  geneset_manifest: "resources/genesets/dna_repair/geneset_manifest.tsv"
+  alpha: 0.05
+  min_genes_per_g4_status: 3
+
+hic_bams: [
+  "0", "12", "30", "60", 
+  ]
+
+oqs:
+  minus_K:
+    bed: "minus_K.bed.gz"
+    bed_url: "https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM3003nnn/GSM3003539/suppl/GSM3003539%5FHomo%5Fall%5Fw15%5Fth%2D1%5Fminus.hits.max.K.w50.25.bed.gz"
+    bedgraph: "minus_K.bedGraph.gz"
+    bedgraph_url: "https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM3003nnn/GSM3003539/suppl/GSM3003539%5FHomo%5Fall%5Fw15%5Fth%2D1%5Fminus.K.bedGraph.gz"
+  plus_K:
+    bed: "plus_K.bed.gz"
+    bed_url: "https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM3003nnn/GSM3003539/suppl/GSM3003539%5FHomo%5Fall%5Fw15%5Fth%2D1%5Fplus.hits.max.K.w50.25.bed.gz"
+    bedgraph: "plus_K.bedGraph.gz"
+    bedgraph_url: "https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM3003nnn/GSM3003539/suppl/GSM3003539%5FHomo%5Fall%5Fw15%5Fth%2D1%5Fplus.K.bedGraph.gz"  
+  minus_PDS:
+    bed: "minus_PDS.bed.gz"
+    bed_url: "https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM3003nnn/GSM3003540/suppl/GSM3003540%5FHomo%5Fall%5Fw15%5Fth%2D1%5Fminus.hits.max.PDS.w50.35.bed.gz"
+    bedgraph: "minus_PDS.bedGraph.gz"
+    bedgraph_url: "https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM3003nnn/GSM3003540/suppl/GSM3003540%5FHomo%5Fall%5Fw15%5Fth%2D1%5Fminus.PDS.bedGraph.gz"
+  plus_PDS:
+    bed: "plus_PDS.bed.gz"
+    bed_url: "https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM3003nnn/GSM3003540/suppl/GSM3003540%5FHomo%5Fall%5Fw15%5Fth%2D1%5Fplus.hits.max.PDS.w50.35.bed.gz"
+    bedgraph: "plus_PDS.bedGraph.gz"
+    bedgraph_url: "https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM3003nnn/GSM3003540/suppl/GSM3003540%5FHomo%5Fall%5Fw15%5Fth%2D1%5Fplus.PDS.bedGraph.gz"
+
+pqsfinder:
+  url: "https://pqsfinder.fi.muni.cz/hub/hg38/pqsfinder_hg38_bed.tar.gz"
+  archive_member: "pqsfinder_hg38.bed"
+  subset_size: 100000
+  dataset_order: ["pqs_low", "pqs_high"]
+
+markers: "resources/HELA_S3/HeLa_S3.tsv"
 
 samples:
   HXA64A1_ATCACG_hg38_XR:
@@ -49,18 +131,91 @@ samples:
     product: CPD
     time_after_exposure: 0
     name: HDC_0_rep2
+  # NT4H1-CT5H2-HelaD1-5R2h2_combined_hg38_DS:
+  #   method: DS
+  #   cell: Hela
+  #   product: CPD
+  #   time_after_exposure: 120
+  #   name: HDEC_120_rep1
+  # XT4H1-CT5H2-HelaD3-5R2h2_combined_hg38_DS:
+  #   method: DS
+  #   cell: Hela
+  #   product: CPD
+  #   time_after_exposure: 120
+  #   name: HDLC_120_rep1
+  # R19029847-HD2TCD4-HelaD1-5R2h1_combined_hg38_DS:
+  #   method: DS
+  #   cell: Hela
+  #   product: CPD
+  #   time_after_exposure: 120
+  #   name: HDEC_120_rep2
+  # R19029847-HD2TCD4-HelaD3-5R2h1_combined_hg38_DS:
+  #   method: DS
+  #   cell: Hela
+  #   product: CPD
+  #   time_after_exposure: 120
+  #   name: HDLC_120_rep2
+  # R19026421-2019XR1-Hela15X2_combined_R1_hg38_XR:
+  #   method: XR
+  #   cell: Hela
+  #   product: CPD
+  #   time_after_exposure: 120
+  #   name: HXEC_120_rep1
+  # R19026421-2019XR1-Hela35X3_combined_R1_hg38_XR:
+  #   method: XR
+  #   cell: Hela
+  #   product: CPD
+  #   time_after_exposure: 120
+  #   name: HXLC_120_rep1
+  # R19033030-2019XR3-Hela15X7_combined_R1_hg38_XR:
+  #   method: XR
+  #   cell: Hela
+  #   product: CPD
+  #   time_after_exposure: 120
+  #   name: HXEC_120_rep2
+  # R19033030-2019XR3-Hela35X8_combined_R1_hg38_XR:
+  #   method: XR
+  #   cell: Hela
+  #   product: CPD
+  #   time_after_exposure: 120
+  #   name: HXLC_120_rep2
+
+  # Hela0m64R1_GATCAG_S1_L001_hg38_DS:
+  #   method: DS
+  #   cell: Hela
+  #   product: 64-PP
+  #   time_after_exposure: 0
+  #   name: HD64_0_rep3
+  # Hela0mCPDR1_CGATGT_S2_L001_hg38_DS:
+  #   method: DS
+  #   cell: Hela
+  #   product: CPD
+  #   time_after_exposure: 0
+  #   name: HDC_0_rep3
   R3Hela_1m64_CGATGT_S5_hg38_DS:
     method: DS
     cell: Hela
     product: 64-PP
-    time_after_exposure: 0
-    name: HD64_0_rep3
+    time_after_exposure: 1
+    name: HD64_1_rep1
   R3Hela_1mCPD_GATCAG_S6_hg38_DS:
     method: DS
     cell: Hela
     product: CPD
-    time_after_exposure: 0
-    name: HDC_0_rep3
+    time_after_exposure: 1
+    name: HDC_1_rep1
+  # Hela12m64R1_TAGCTT_S3_L001_hg38_DS:
+  #   method: DS
+  #   cell: Hela
+  #   product: 64-PP
+  #   time_after_exposure: 12
+  #   name: HD64_12_rep1
+  # Hela12mCPDR1_GCCAAT_S4_L001_hg38_DS:
+  #   method: DS
+  #   cell: Hela
+  #   product: CPD
+  #   time_after_exposure: 12
+  #   name: HDC_12_rep1
   R3Hela_15m64_TTAGGC_S1_hg38_DS:
     method: DS
     cell: Hela
@@ -73,24 +228,48 @@ samples:
     product: CPD
     time_after_exposure: 15
     name: HDC_15_rep1
+  # Hela30m64R1_GGCTAC_S7_L001_hg38_DS:
+  #   method: DS
+  #   cell: Hela
+  #   product: 64-PP
+  #   time_after_exposure: 30
+  #   name: HD64_30_rep1
   R3Hela_30m64_TGACCA_S7_hg38_DS:
     method: DS
     cell: Hela
     product: 64-PP
     time_after_exposure: 30
     name: HD64_30_rep2
+  # Hela30mCPDR1_CAGATC_S8_L001_hg38_DS:
+  #   method: DS
+  #   cell: Hela
+  #   product: CPD
+  #   time_after_exposure: 30
+  #   name: HDC_30_rep1
   R3Hela_30mCPD_GGCTAC_S8_hg38_DS:
     method: DS
     cell: Hela
     product: CPD
     time_after_exposure: 30
     name: HDC_30_rep2
+  # Hela1h64R1_CTTGTA_S5_L001_hg38_DS:
+  #   method: DS
+  #   cell: Hela
+  #   product: 64-PP
+  #   time_after_exposure: 60
+  #   name: HD64_60_rep1
   R3Hela_1h64_ACAGTG_S3_hg38_DS:
     method: DS
     cell: Hela
     product: 64-PP
     time_after_exposure: 60
     name: HD64_60_rep2
+  # Hela1hCPDR1_ACTTGA_S6_L001_hg38_DS:
+  #   method: DS
+  #   cell: Hela
+  #   product: CPD
+  #   time_after_exposure: 60
+  #   name: HDC_60_rep1
   R3Hela_1hCPD_CTTGTA_S4_hg38_DS:
     method: DS
     cell: Hela
@@ -121,46 +300,3 @@ samples:
     product: CPD
     time_after_exposure: 480
     name: HDC_480_rep1
-
-
-region_names:
-  - "oqs_0_11_10"
-  - "oqs_0_101_10"
-  - "oqs_0_101_50"
-  - "oqs_0_101_100"
-  - "oqs_12_11_10"
-  - "oqs_12_101_10"
-  - "oqs_12_101_50"
-  - "oqs_12_101_100"
-  - "oqs_30_11_10"
-  - "oqs_30_101_10"
-  - "oqs_30_101_50"
-  - "oqs_30_101_100"
-  - "oqs_60_11_10"
-  - "oqs_60_101_10"
-  - "oqs_60_101_50"
-  - "oqs_60_101_100"
-  - "oqs_lost_after_uv_11_10"
-  - "oqs_lost_after_uv_101_10"
-  - "oqs_lost_after_uv_101_50"
-  - "oqs_lost_after_uv_101_100"
-  - "oqs_formed_after_uv_11_10"
-  - "oqs_formed_after_uv_101_10"
-  - "oqs_formed_after_uv_101_50"
-  - "oqs_formed_after_uv_101_100"
-  - "oqs_persistent_11_10"
-  - "oqs_persistent_101_10"
-  - "oqs_persistent_101_50"
-  - "oqs_persistent_101_100"
-  - "oqs_never_formed_11_10"
-  - "oqs_never_formed_101_10"
-  - "oqs_never_formed_101_50"
-  - "oqs_never_formed_101_100"
-  - "oqs_cur_alg_101_100"
-  - "tss_11_10"
-  - "tss_101_10"
-  - "tss_101_50"
-  - "tss_101_100"
-  - "tss_201_100"
-
-

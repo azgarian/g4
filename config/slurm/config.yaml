@@ -1,56 +1,22 @@
-# SLURM Configuration for Snakemake
-# This configuration is based on a working HPC setup
-#
-# How this profile is used:
-#   snakemake --profile config/slurm
-# The options here mirror Snakemake CLI flags and executor plugin settings.
+jobs: 100
 
-# Max number of jobs Snakemake may have active/pending on the cluster at once
-jobs: 1000
-
-# Use the cluster-generic executor plugin (installed via env)
+# Configure for Snakemake >= 8.0
 executor: "cluster-generic"
-
-# sbatch submission template used per job. Placeholders are filled by Snakemake:
-#   {rule}                -> rule name (used for job name and log names)
-#   {threads}             -> threads requested by the rule (maps to --cpus-per-task)
-#   {resources.account}   -> account set via default-resources or rule resources
-#   {resources.partition} -> partition set via default-resources or rule resources
-#   %A                    -> SLURM array/job id (emitted by sbatch)
-# Notes:
-#   -e writes stderr to logs/cluster; stdout is discarded to /dev/null here. Adjust if needed.
-#   --qos is set equal to partition; change to your site policy if different.
-cluster-generic-submit-cmd: "sbatch -A {resources.account} -p {resources.partition} -J {rule}.job --qos {resources.partition} --cpus-per-task={threads} -e logs/cluster/{rule}_%A.err --output=/dev/null" 
-
-# Software deployment mode. With "conda", per-rule environments are supported.
+cluster-generic-submit-cmd: "sbatch -A {resources.account} -p {resources.partition} -J {rule}.job --qos {resources.qos} --cpus-per-task={threads} --mem={resources.mem_mb} {resources.slurm_extra} -e logs/cluster/{rule}_%A.err --output=/dev/null"
 software-deployment-method: "conda"
-# Use mamba as the conda frontend for faster solves (uncomment to enable)
-# conda-frontend: "mamba"
-scheduler: "greedy"
 
-# Print the shell commands that are executed
 printshellcmds: True
-# Continue other jobs if one fails
 keep-going: True
-# Recreate outputs of jobs that finished incompletely
 rerun-incomplete: True
-# Rerun triggers; "mtime" reruns when input file modification times change
 rerun-triggers: "mtime"
+# rerun-triggers: "input"
 
-# Default resources for all jobs
-# Adjust account and partition according to your HPC setup.
-# These values feed the placeholders used in the submit command above.
-default-resources: [account='users', partition='mem']
+#set-resources: [
+#  meme_chip:ntasks=8, 
+#  ]
 
-# Optional: Set specific resources for certain rules (overrides defaults)
-# Format matches CLI `--set-resources`. Examples:
-# set-resources: [
-#   "example_rule:partition='long_mdbf'",
-#   "example_rule2:mem_mb=16000",
-# ]
 
-# Additional SLURM options (uncomment if needed):
-# Command used to cancel jobs
-# cluster-generic-cancel-cmd: "scancel"
-# Command to query job state; must print one of SLURM states on stdout
-# cluster-generic-status-cmd: "sacct -j {cluster.jobid} --format=State --noheader | head -1 | awk '{{print $1}}'"
+# default-resources: [account='investor', partition='mid_investor', qos="mid_investor"]
+# default-resources: [account='users', partition='long_mdbf', qos="long_mdbf"] # sakura
+# default-resources: [account='mdbf', partition='mid_mdbf', qos="mid_mdbf"]
+default-resources: [account='adelab', partition='genomics', qos="adelab", slurm_extra='', mem_mb=8000]
