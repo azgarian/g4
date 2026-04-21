@@ -9,3 +9,8 @@ logs/cluster/*
 
 .snakemake/*
 .DS_Store
+run.log
+
+.codex
+tmp/
+workflow/scripts/__pycache__/
