@@ -28,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--baseline-tpm", required=True)
     p.add_argument("--g4chip-tsv", required=True)
     p.add_argument("--g4cuttag-tsv", required=True)
+    p.add_argument("--analysis-label", default=None)
     p.add_argument("--out-structure-by-expression", required=True)
     p.add_argument("--out-plot", required=True)
     p.add_argument("--out-enrichment-stats", required=True)
@@ -55,7 +56,7 @@ def intersect_structures(windows_bed: str, struct_tsv: str) -> pd.DataFrame:
     tsv_to_bed6(struct_tsv, tmp_path)
 
     result = subprocess.run(
-        ["bedtools", "intersect", "-wa", "-wb", "-a", windows_bed, "-b", tmp_path],
+        ["bedtools", "intersect", "-nonamecheck", "-wa", "-wb", "-a", windows_bed, "-b", tmp_path],
         capture_output=True, text=True, check=True
     )
     Path(tmp_path).unlink(missing_ok=True)
@@ -95,7 +96,7 @@ def intersect_structures_full(windows_bed: str, struct_tsv: str) -> pd.DataFrame
     ext.to_csv(tmp_path, sep="\t", header=False, index=False)
 
     result = subprocess.run(
-        ["bedtools", "intersect", "-wa", "-wb", "-a", windows_bed, "-b", tmp_path],
+        ["bedtools", "intersect", "-nonamecheck", "-wa", "-wb", "-a", windows_bed, "-b", tmp_path],
         capture_output=True, text=True, check=True
     )
     Path(tmp_path).unlink(missing_ok=True)
@@ -122,6 +123,9 @@ def main() -> None:
     def log(msg: str) -> None:
         if log_fh:
             print(msg, file=log_fh, flush=True)
+
+    if args.analysis_label:
+        log(f"Analysis label: {args.analysis_label}")
 
     anno = pd.read_csv(args.tss_annotation, sep="\t")
     tpm = pd.read_csv(args.baseline_tpm, sep="\t")
@@ -240,7 +244,8 @@ def main() -> None:
         pivot.plot(kind="bar", ax=ax, colormap="RdYlBu_r", width=0.75)
         ax.set_xlabel("G4 structure class")
         ax.set_ylabel("Fraction of G4_TSS genes in class")
-        ax.set_title("G4 structure class distribution across expression classes")
+        title_prefix = f"{args.analysis_label}: " if args.analysis_label else ""
+        ax.set_title(f"{title_prefix}G4 structure class distribution across expression classes")
         ax.legend(title="Expression class", bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=8)
         plt.xticks(rotation=45, ha="right", fontsize=8)
         plt.tight_layout()

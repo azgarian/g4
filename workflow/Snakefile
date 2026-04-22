@@ -23,3 +23,4 @@ include: "rules/g4p_cut_tag.smk"  # g4cuttag peaks from FASTQ
 include: "rules/g4chip_g4cuttag_merge.smk"  # Merge g4chip and g4cuttag intervals
 include: "rules/rnaseq.smk"  # RNA-seq quantification and DESeq2 time-series
 include: "rules/g4_tss.smk"  # G4-TSS transcription analysis (Tasks 1-8)
+include: "rules/g4_tss_atac_split.smk"  # ATAC-filtered G4-TSS transcription analysis

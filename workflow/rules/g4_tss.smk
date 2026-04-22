@@ -404,6 +404,122 @@ rule g4_tss_structure_enrichment:
         """
 
 
+# ─── Task 9: Per-gene promoter-G4 × LRT intersection table ───────────────────
+
+rule g4_tss_pg4_deg_intersect:
+    input:
+        annotation=rules.g4_tss_build_annotation.output.tsv,
+        lrt="results/rnaseq/deseq2/time_lrt_results.tsv.gz",
+        norm_counts="results/rnaseq/matrices/normalized_counts.tsv.gz",
+        baseline_tpm=rules.g4_tss_baseline_expression.output.baseline_tpm,
+        pairwise_0_12="results/rnaseq/deseq2/pairwise/0_vs_12_results.tsv.gz",
+        pairwise_0_30="results/rnaseq/deseq2/pairwise/0_vs_30_results.tsv.gz",
+        pairwise_0_60="results/rnaseq/deseq2/pairwise/0_vs_60_results.tsv.gz",
+    output:
+        intersect="results/g4_tss/pG4_DEG_intersect.tsv",
+    log:
+        "logs/g4_tss/pg4_deg_intersect.log",
+    conda:
+        "../envs/g4_tss.yaml"
+    shell:
+        """
+        (echo "`date -R`: Building promoter-G4 × LRT intersection table..." &&
+        python3 workflow/scripts/g4_tss_pg4_deg_intersect.py \
+          --tss-annotation {input.annotation} \
+          --lrt-results {input.lrt} \
+          --norm-counts {input.norm_counts} \
+          --baseline-tpm {input.baseline_tpm} \
+          --pairwise-0-vs-12 {input.pairwise_0_12} \
+          --pairwise-0-vs-30 {input.pairwise_0_30} \
+          --pairwise-0-vs-60 {input.pairwise_0_60} \
+          --out-intersect {output.intersect} \
+          --log {log} &&
+        echo "`date -R`: Success!" ||
+        {{ echo "`date -R`: Process failed..."; exit 1; }} ) > {log} 2>&1
+        """
+
+
+# ─── Task 10: Functional enrichment and G4-strength stratification ─────────────
+
+rule g4_tss_pg4_enrichment:
+    input:
+        pg4_deg=rules.g4_tss_pg4_deg_intersect.output.intersect,
+        windows=rules.g4_tss_slop_windows.output.windows,
+        g4_intersect=rules.g4_tss_intersect_g4.output,
+        g4chip_source_bed="results/g4chip/g4_hela_peaks_prepared.bed",
+        g4cuttag_source_bed="results/g4cuttag/g4_hela_peaks_prepared.bed",
+    params:
+        gene_set_gmt=lambda w: (
+            config.get("g4_tss_pg4", {}).get("gene_set_gmt", "")
+        ),
+        gene_set_manifest=lambda w: (
+            config.get("rna_seq_g4_context", {}).get("geneset_manifest", "")
+        ),
+        strength_metric=lambda w: (
+            config.get("g4_tss_pg4", {}).get("strength_metric", "max_signal")
+        ),
+    output:
+        enrichment_table="results/g4_tss/pG4_pathway_enrichment.tsv",
+        g4_strength_table="results/g4_tss/pG4_strength_stratification.tsv",
+        g4_strength_plot="results/g4_tss/pG4_strength_stratification.pdf",
+        summary="results/g4_tss/pG4_enrichment_summary.tsv",
+    log:
+        "logs/g4_tss/pg4_enrichment.log",
+    conda:
+        "../envs/g4_tss.yaml"
+    shell:
+        """
+        (echo "`date -R`: Running G4-strength stratification and pathway enrichment..." &&
+        GENE_SET_GMT_ARG="" &&
+        GENE_SET_MANIFEST_ARG="" &&
+        [ -n "{params.gene_set_gmt}" ] && [ -f "{params.gene_set_gmt}" ] && \
+          GENE_SET_GMT_ARG="--gene-set-gmt {params.gene_set_gmt}" || true &&
+        [ -n "{params.gene_set_manifest}" ] && [ -f "{params.gene_set_manifest}" ] && \
+          GENE_SET_MANIFEST_ARG="--gene-set-manifest {params.gene_set_manifest}" || true &&
+        python3 workflow/scripts/g4_tss_pg4_enrichment.py \
+          --pg4-deg-intersect {input.pg4_deg} \
+          --tss-windows-bed {input.windows} \
+          --g4-intersect-bed {input.g4_intersect} \
+          --g4chip-source-bed {input.g4chip_source_bed} \
+          --g4cuttag-source-bed {input.g4cuttag_source_bed} \
+          --strength-metric {params.strength_metric} \
+          $GENE_SET_GMT_ARG \
+          $GENE_SET_MANIFEST_ARG \
+          --out-enrichment-table {output.enrichment_table} \
+          --out-g4-strength-table {output.g4_strength_table} \
+          --out-g4-strength-plot {output.g4_strength_plot} \
+          --out-summary {output.summary} \
+          --log {log} &&
+        echo "`date -R`: Success!" ||
+        {{ echo "`date -R`: Process failed..."; exit 1; }} ) > {log} 2>&1
+        """
+
+
+# ─── Task 11: Endpoint QC and sensitivity checks ───────────────────────────────
+
+rule g4_tss_pg4_sensitivity:
+    input:
+        annotation=rules.g4_tss_build_annotation.output.tsv,
+        lrt="results/rnaseq/deseq2/time_lrt_results.tsv.gz",
+    output:
+        sensitivity="results/g4_tss/pG4_sensitivity_qc.tsv",
+    log:
+        "logs/g4_tss/pg4_sensitivity.log",
+    conda:
+        "../envs/g4_tss.yaml"
+    shell:
+        """
+        (echo "`date -R`: Running endpoint QC and sensitivity checks..." &&
+        python3 workflow/scripts/g4_tss_pg4_sensitivity.py \
+          --tss-annotation {input.annotation} \
+          --lrt-results {input.lrt} \
+          --out-sensitivity-table {output.sensitivity} \
+          --log {log} &&
+        echo "`date -R`: Success!" ||
+        {{ echo "`date -R`: Process failed..."; exit 1; }} ) > {log} 2>&1
+        """
+
+
 # ─── Task 8: HTML report ───────────────────────────────────────────────────────
 
 rule g4_tss_report:
@@ -450,8 +566,7 @@ rule g4_tss_report:
           --enrichment-stats {input.enrichment_stats} \
           --structure-plot {input.struct_plot} \
           --out-html {output.html} \
-          --out-versions {output.versions} \
-          --log {log} &&
+          --out-versions {output.versions} &&
         echo "`date -R`: Success!" ||
         {{ echo "`date -R`: Process failed..."; exit 1; }} ) > {log} 2>&1
         """

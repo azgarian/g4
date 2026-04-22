@@ -17,6 +17,28 @@ rna_seq:
   annotation_dir: "resources/ref_genomes/hg38_rnaseq_v35"
   gencode_v35_gtf_url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_35/gencode.v35.annotation.gtf.gz"
 
+g4_tss_atac_split:
+  timepoints: ["noUV", "15m", "30m", "60m"]
+  atac_peak_beds:
+    noUV: "resources/samples/atac/HelanoUV_hg38.idr.optimal.bed"
+    15m: "resources/samples/atac/Hela_15m_hg38.idr.optimal.bed"
+    30m: "resources/samples/atac/Hela_30m_hg38.idr.optimal.bed"
+    60m: "resources/samples/atac/Hela_1h_hg38.idr.optimal.bed"
+  rnaseq_timepoint_map:
+    noUV: 0
+    15m: 12
+    30m: 30
+    60m: 60
+  rnaseq_bigwig_map:
+    noUV: "resources/rna-seq/merged_t00.bw"
+    15m: "resources/rna-seq/merged_t12.bw"
+    30m: "resources/rna-seq/merged_t30.bw"
+    60m: "resources/rna-seq/merged_t60.bw"
+  deseq_pairwise_map:
+    15m: "results/rnaseq/deseq2/pairwise/0_vs_12_results.tsv.gz"
+    30m: "results/rnaseq/deseq2/pairwise/0_vs_30_results.tsv.gz"
+    60m: "results/rnaseq/deseq2/pairwise/0_vs_60_results.tsv.gz"
+
 rna_seq_g4:
   promoter_upstream_bp: 2000
   promoter_downstream_bp: 100

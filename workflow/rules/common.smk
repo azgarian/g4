@@ -37,4 +37,18 @@ def allInput():
     inputList.append("results/g4_tss/structure_class_by_expression_class.pdf")
     inputList.append("results/g4_tss/g4_tss_transcription_report.html")
 
+    # smk: g4_tss (Tasks 9-11 — pG4 × LRT intersection, enrichment, sensitivity)
+    inputList.append("results/g4_tss/pG4_DEG_intersect.tsv")
+    inputList.append("results/g4_tss/pG4_pathway_enrichment.tsv")
+    inputList.append("results/g4_tss/pG4_strength_stratification.tsv")
+    inputList.append("results/g4_tss/pG4_strength_stratification.pdf")
+    inputList.append("results/g4_tss/pG4_enrichment_summary.tsv")
+    inputList.append("results/g4_tss/pG4_sensitivity_qc.tsv")
+
+    # smk: g4_tss_atac_split
+    for timepoint in config.get("g4_tss_atac_split", {}).get("timepoints", []):
+        inputList.append(
+            f"results/g4_tss_atac_split/{timepoint}/g4_tss_atac_split_report.html"
+        )
+
     return inputList

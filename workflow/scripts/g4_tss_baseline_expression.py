@@ -23,12 +23,21 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--tss-annotation", required=True, help="tss_group_annotation.tsv from Task 1")
     p.add_argument("--tpm-matrix", required=True, help="gene_tpm.tsv.gz")
     p.add_argument("--norm-counts-matrix", required=True, help="normalized_counts.tsv.gz")
+    p.add_argument("--sample-manifest", default=None,
+                   help="Optional sample manifest used to select an explicit RNA-seq timepoint")
+    p.add_argument("--rna-timepoint", type=int, default=None,
+                   help="RNA-seq timepoint to select from the sample manifest")
+    p.add_argument("--analysis-label", default=None,
+                   help="Optional label used only for logging context")
     p.add_argument("--out-baseline-tpm", required=True)
     p.add_argument("--out-baseline-tpm-summary", required=True)
     p.add_argument("--out-baseline-norm-counts", required=True)
     p.add_argument("--out-gene-expression-by-group", required=True)
     p.add_argument("--log", default=None)
-    return p.parse_args()
+    args = p.parse_args()
+    if (args.sample_manifest is None) != (args.rna_timepoint is None):
+        p.error("--sample-manifest and --rna-timepoint must be provided together")
+    return args
 
 
 def t00_columns(df: pd.DataFrame) -> list[str]:
@@ -41,6 +50,21 @@ def t00_columns(df: pd.DataFrame) -> list[str]:
     return t00
 
 
+def manifest_columns(
+    df: pd.DataFrame,
+    manifest: pd.DataFrame,
+    rna_timepoint: int,
+) -> tuple[list[str], list[str], list[str]]:
+    """Return requested, present, and missing sample columns for an RNA-seq timepoint."""
+    time_col = "timepoint" if "timepoint" in manifest.columns else "timepoint_label"
+    sample_ids = manifest.loc[
+        manifest[time_col].astype(str) == str(rna_timepoint), "sample_id"
+    ].astype(str).tolist()
+    present = [sample_id for sample_id in sample_ids if sample_id in df.columns]
+    missing = [sample_id for sample_id in sample_ids if sample_id not in df.columns]
+    return sample_ids, present, missing
+
+
 def main() -> None:
     args = parse_args()
     log_fh = open(args.log, "w") if args.log else sys.stdout
@@ -48,18 +72,37 @@ def main() -> None:
     def log(msg: str) -> None:
         print(msg, file=log_fh, flush=True)
 
+    if args.analysis_label:
+        log(f"Analysis label: {args.analysis_label}")
+
     anno = pd.read_csv(args.tss_annotation, sep="\t")
     log(f"TSS annotation: {len(anno):,} genes")
+
+    manifest = None
+    if args.sample_manifest:
+        manifest = pd.read_csv(args.sample_manifest, sep="\t")
+        log(
+            f"Selecting RNA-seq samples for timepoint {args.rna_timepoint} using "
+            f"{args.sample_manifest}"
+        )
 
     # --- TPM matrix ---
     tpm = pd.read_csv(args.tpm_matrix, sep="\t", compression="gzip")
     log(f"TPM matrix columns: {list(tpm.columns[:8])}{'...' if len(tpm.columns) > 8 else ''}")
 
-    t00_cols = t00_columns(tpm)
-    log(f"t00 TPM columns identified: {t00_cols}")
+    if manifest is not None:
+        requested_tpm, t00_cols, missing_tpm = manifest_columns(tpm, manifest, args.rna_timepoint)
+        log(f"Requested TPM samples for RNA timepoint {args.rna_timepoint}: {requested_tpm}")
+        if missing_tpm:
+            log(f"WARNING: TPM samples missing from matrix: {missing_tpm}")
+    else:
+        t00_cols = t00_columns(tpm)
+        log(f"t00 TPM columns identified: {t00_cols}")
+        if not t00_cols:
+            log("WARNING: no t00 columns found in TPM matrix; using all non-ID columns")
+            t00_cols = [c for c in tpm.columns if c not in ("gene_id", "gene_name")]
     if not t00_cols:
-        log("WARNING: no t00 columns found in TPM matrix; using all non-ID columns")
-        t00_cols = [c for c in tpm.columns if c not in ("gene_id", "gene_name")]
+        raise ValueError("No TPM sample columns were selected for expression summarization")
 
     id_col = "gene_id" if "gene_id" in tpm.columns else tpm.columns[0]
     baseline_tpm = tpm[[id_col] + t00_cols].copy()
@@ -107,10 +150,18 @@ def main() -> None:
     nc = pd.read_csv(args.norm_counts_matrix, sep="\t", compression="gzip")
     log(f"Normalized counts matrix columns: {list(nc.columns[:8])}{'...' if len(nc.columns) > 8 else ''}")
 
-    t00_nc = t00_columns(nc)
-    log(f"t00 normalized count columns identified: {t00_nc}")
+    if manifest is not None:
+        requested_nc, t00_nc, missing_nc = manifest_columns(nc, manifest, args.rna_timepoint)
+        log(f"Requested normalized-count samples for RNA timepoint {args.rna_timepoint}: {requested_nc}")
+        if missing_nc:
+            log(f"WARNING: normalized-count samples missing from matrix: {missing_nc}")
+    else:
+        t00_nc = t00_columns(nc)
+        log(f"t00 normalized count columns identified: {t00_nc}")
+        if not t00_nc:
+            t00_nc = [c for c in nc.columns if c not in ("gene_id", "gene_name")]
     if not t00_nc:
-        t00_nc = [c for c in nc.columns if c not in ("gene_id", "gene_name")]
+        raise ValueError("No normalized-count sample columns were selected for expression summarization")
 
     id_col_nc = "gene_id" if "gene_id" in nc.columns else nc.columns[0]
     baseline_nc = nc[[id_col_nc] + t00_nc].copy()
@@ -141,11 +192,14 @@ def main() -> None:
     log(f"gene_expression_by_group.tsv: {len(by_group):,} genes")
 
     # summary statistics
+    timepoint_label = (
+        f"RNA timepoint {args.rna_timepoint}" if args.rna_timepoint is not None else "baseline"
+    )
     log("\nSummary notes:")
     log("  TPM-derived quartiles and 'silent' class used for descriptive stratification and Task 7.")
     log("  mean_log2 from normalized counts is the inferential metric used in Tasks 3-5.")
-    log(f"\n  Baseline-expressed genes: {(~all_zero).sum():,}")
-    log(f"  Silent genes (all t00 TPM = 0): {all_zero.sum():,}")
+    log(f"\n  Expressed genes for {timepoint_label}: {(~all_zero).sum():,}")
+    log(f"  Silent genes for {timepoint_label}: {all_zero.sum():,}")
 
     ec = merged_tpm["expression_class"].value_counts()
     for cls in ["silent", "Q1", "Q2", "Q3", "Q4"]:

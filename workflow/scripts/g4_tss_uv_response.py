@@ -32,17 +32,35 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--tss-annotation", required=True)
     p.add_argument("--lrt-results", required=True, help="time_lrt_results.tsv.gz")
-    p.add_argument("--pairwise-0-vs-60", required=True, help="0_vs_60_results.tsv.gz")
+    p.add_argument("--pairwise-results", dest="pairwise_results", default=None,
+                   help="Pairwise DESeq2 results for the matched RNA-seq comparison")
+    p.add_argument("--pairwise-0-vs-60", dest="pairwise_results", default=None,
+                   help="Backward-compatible alias for --pairwise-results")
+    p.add_argument("--analysis-label", default=None)
+    p.add_argument("--contrast-label", default=None,
+                   help="Display label for the DESeq2 pairwise comparison, e.g. '0 vs 12 min'")
     p.add_argument("--out-lrt-summary", required=True)
     p.add_argument("--out-fc-stats", required=True)
     p.add_argument("--out-fc-plot", required=True)
     p.add_argument("--out-volcano-plot", required=True)
     p.add_argument("--log", default=None)
-    return p.parse_args()
+    args = p.parse_args()
+    if args.pairwise_results is None:
+        p.error("one of --pairwise-results or --pairwise-0-vs-60 is required")
+    return args
 
 
 def strip_version(series: pd.Series) -> pd.Series:
     return series.astype(str).str.replace(r"\.\d+$", "", regex=True)
+
+
+def infer_contrast_parts(pairwise_df: pd.DataFrame) -> tuple[str | None, str | None]:
+    if {"numerator_timepoint", "denominator_timepoint"}.issubset(pairwise_df.columns):
+        numerator = pairwise_df["numerator_timepoint"].dropna()
+        denominator = pairwise_df["denominator_timepoint"].dropna()
+        if not numerator.empty and not denominator.empty:
+            return str(int(numerator.iloc[0])), str(int(denominator.iloc[0]))
+    return None, None
 
 
 def main() -> None:
@@ -53,14 +71,29 @@ def main() -> None:
         if log_fh:
             print(msg, file=log_fh, flush=True)
 
+    if args.analysis_label:
+        log(f"Analysis label: {args.analysis_label}")
+
     anno = pd.read_csv(args.tss_annotation, sep="\t")
     anno["gene_id_nv"] = strip_version(anno["gene_id"])
 
     lrt = pd.read_csv(args.lrt_results, sep="\t", compression="gzip")
-    pw = pd.read_csv(args.pairwise_0_vs_60, sep="\t", compression="gzip")
+    pw = pd.read_csv(args.pairwise_results, sep="\t", compression="gzip")
 
     lrt["gene_id_nv"] = strip_version(lrt["gene_id"])
     pw["gene_id_nv"] = strip_version(pw["gene_id"])
+    numerator_tp, denominator_tp = infer_contrast_parts(pw)
+    contrast_label = args.contrast_label
+    if contrast_label is None:
+        if numerator_tp is not None and denominator_tp is not None:
+            contrast_label = f"{numerator_tp} vs {denominator_tp} min"
+        else:
+            contrast_label = "0 vs 60 min"
+    sign_label = (
+        f"positive log2FC = higher at {numerator_tp} min than {denominator_tp} min"
+        if numerator_tp is not None and denominator_tp is not None
+        else "positive log2FC = higher in the numerator condition than the denominator condition"
+    )
 
     merged = anno[["gene_id", "gene_id_nv", "gene_name", "group"]].merge(
         lrt[["gene_id_nv", "padj"]].rename(columns={"padj": "lrt_padj"}),
@@ -78,8 +111,7 @@ def main() -> None:
         Path(outpath).parent.mkdir(parents=True, exist_ok=True)
 
     log(f"Merged annotation with DESeq2 results: {len(merged):,} genes")
-    log("Sign convention: positive log2FC = repression after UV; "
-        "negative log2FC = induction after UV")
+    log(f"Sign convention: {sign_label}")
 
     # --- LRT summary per group ---
     lrt_rows = []
@@ -131,7 +163,7 @@ def main() -> None:
     ]
     if all(len(x) > 0 for x in fc_by_grp):
         kw_stat, kw_p = stats.kruskal(*fc_by_grp)
-        log(f"Kruskal-Wallis on 0_vs_60 log2FC: H={kw_stat:.4f}, p={kw_p:.4e}")
+        log(f"Kruskal-Wallis on {contrast_label} log2FC: H={kw_stat:.4f}, p={kw_p:.4e}")
 
     # --- Violin + boxplot of fold changes ---
     plot_df = merged[merged["log2FoldChange"].notna()].copy()
@@ -144,9 +176,14 @@ def main() -> None:
                 linewidth=0.8, color="white", ax=ax)
     ax.axhline(0, color="black", lw=0.8, ls="--")
     ax.set_xlabel("")
-    ax.set_ylabel("log₂ fold change (0 vs 60 min)")
-    ax.set_title("UV-induced fold change by promoter group\n"
-                 "(positive = repression after UV)")
+    ax.set_ylabel(f"log₂ fold change ({contrast_label})")
+    title_prefix = f"{args.analysis_label}: " if args.analysis_label else ""
+    ax.set_title(
+        f"{title_prefix}UV-induced fold change by promoter group\n"
+        f"(positive = higher at {numerator_tp} min)"
+        if numerator_tp is not None
+        else f"{title_prefix}UV-induced fold change by promoter group"
+    )
     plt.tight_layout()
     fig.savefig(args.out_fc_plot, dpi=150)
     plt.close(fig)
@@ -163,9 +200,9 @@ def main() -> None:
     ax.axhline(-np.log10(0.05), color="gray", lw=0.8, ls="--")
     ax.axvline(0.5, color="gray", lw=0.5, ls=":")
     ax.axvline(-0.5, color="gray", lw=0.5, ls=":")
-    ax.set_xlabel("log₂FC (0 vs 60 min)")
+    ax.set_xlabel(f"log₂FC ({contrast_label})")
     ax.set_ylabel("-log₁₀(adj. p-value)")
-    ax.set_title("UV-response volcano (0 vs 60 min)")
+    ax.set_title(f"{title_prefix}UV-response volcano ({contrast_label})")
     ax.legend(markerscale=3, fontsize=8)
     plt.tight_layout()
     fig.savefig(args.out_volcano_plot, dpi=150)

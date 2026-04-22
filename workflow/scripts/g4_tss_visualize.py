@@ -32,6 +32,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--tss-annotation", required=True)
     p.add_argument("--expression-statistics", required=True,
                    help="expression_group_statistics.tsv for p-value annotations")
+    p.add_argument("--analysis-label", default=None)
+    p.add_argument("--expression-label", default="Baseline expression")
     p.add_argument("--out-violin-pdf", required=True)
     p.add_argument("--out-bed-g4-tss", required=True)
     p.add_argument("--out-bed-gc-bg-tss", required=True)
@@ -110,9 +112,10 @@ def main() -> None:
         ax=ax,
     )
 
+    title_prefix = f"{args.analysis_label}: " if args.analysis_label else ""
     ax.set_xlabel("")
-    ax.set_ylabel(r"Baseline expression (log$_2$(mean norm. count + 1))")
-    ax.set_title("Baseline expression by TSS promoter group")
+    ax.set_ylabel(f"{args.expression_label} (log$_2$(mean norm. count + 1))")
+    ax.set_title(f"{title_prefix}{args.expression_label} by TSS promoter group")
     ax.set_xticklabels([f"{group}\n(n={group_counts[group]:,})" for group in GROUP_ORDER])
     ax.grid(axis="y", color="#d9d9d9", lw=0.6)
     ax.set_axisbelow(True)
@@ -166,6 +169,8 @@ def main() -> None:
     if args.log:
         import sys
         with open(args.log, "w") as fh:
+            if args.analysis_label:
+                print(f"Analysis label: {args.analysis_label}", file=fh)
             print(f"Violin plot: {args.out_violin_pdf}", file=fh)
             for grp, bed_path in group_bed_map.items():
                 n = len(anno[anno["group"] == grp]) if "group" in anno.columns else "?"

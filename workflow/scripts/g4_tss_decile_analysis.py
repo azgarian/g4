@@ -26,6 +26,8 @@ def parse_args() -> argparse.Namespace:
                    help="canonical_tss_windows_1kb.bed")
     p.add_argument("--g4-merged-bed", required=True)
     p.add_argument("--gc-bg-bed", required=True)
+    p.add_argument("--analysis-label", default=None)
+    p.add_argument("--g4-label", default="G4 merged")
     p.add_argument("--out-deciles", required=True)
     p.add_argument("--out-overlap-fractions", required=True)
     p.add_argument("--out-correlation-stats", required=True)
@@ -42,7 +44,7 @@ def normalize_gene_id(gene_id: str) -> str:
 def bedtools_intersect_fraction(windows_bed: str, peaks_bed: str) -> dict[str, bool]:
     """Return dict gene_id -> has_overlap (True/False)."""
     result = subprocess.run(
-        ["bedtools", "intersect", "-c", "-a", windows_bed, "-b", peaks_bed],
+        ["bedtools", "intersect", "-nonamecheck", "-c", "-a", windows_bed, "-b", peaks_bed],
         capture_output=True, text=True, check=True
     )
     overlaps = {}
@@ -63,6 +65,9 @@ def main() -> None:
     def log(msg: str) -> None:
         if log_fh:
             print(msg, file=log_fh, flush=True)
+
+    if args.analysis_label:
+        log(f"Analysis label: {args.analysis_label}")
 
     expr = pd.read_csv(args.gene_expression_by_group, sep="\t")
     expr["gene_id_norm"] = expr["gene_id"].map(normalize_gene_id)
@@ -130,7 +135,7 @@ def main() -> None:
     fig, ax = plt.subplots(figsize=(7, 4.5))
     x = frac_df["decile"].values
     ax.plot(x, frac_df["g4_overlap_fraction"].values * 100, "o-",
-            color="#d62728", label=f"G4 merged (ρ={rho_g4:.2f})")
+            color="#d62728", label=f"{args.g4_label} (ρ={rho_g4:.2f})")
     ax.plot(x, frac_df["gc_bg_overlap_fraction"].values * 100, "s--",
             color="#ff7f0e", label=f"GC-rich BG (ρ={rho_gc:.2f})")
 
@@ -139,7 +144,8 @@ def main() -> None:
     ax.set_xticklabels(["Silent"] + [str(i) for i in range(1, 11)])
     ax.set_xlabel("Expression decile (0 = silent)")
     ax.set_ylabel("Genes with TSS overlap (%)")
-    ax.set_title("G4 and GC-bg overlap fraction across expression deciles")
+    title_prefix = f"{args.analysis_label}: " if args.analysis_label else ""
+    ax.set_title(f"{title_prefix}G4 and GC-bg overlap fraction across expression deciles")
     ax.grid(axis="y", color="#d9d9d9", lw=0.6)
     ax.legend(fontsize=9)
     plt.tight_layout()
