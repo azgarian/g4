@@ -21,3 +21,5 @@ include: "rules/gc_rich_bg.smk"  # Prepare GC-rich genome background
 include: "rules/g4p_chip_seq.smk"  # g4chip peaks from FASTQ
 include: "rules/g4p_cut_tag.smk"  # g4cuttag peaks from FASTQ
 include: "rules/g4chip_g4cuttag_merge.smk"  # Merge g4chip and g4cuttag intervals
+include: "rules/rnaseq.smk"  # RNA-seq quantification and DESeq2 time-series
+include: "rules/g4_tss.smk"  # G4-TSS transcription analysis (Tasks 1-8)

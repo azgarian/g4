@@ -1,0 +1,17 @@
+name: rnaseq_deseq2
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base=4.3
+  - bioconductor-biocparallel
+  - bioconductor-deseq2
+  - bioconductor-rtracklayer
+  - bioconductor-tximport
+  - r-argparse
+  - r-dplyr
+  - r-ggplot2
+  - r-pheatmap
+  - r-readr
+  - r-tibble

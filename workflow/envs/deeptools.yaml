@@ -1,0 +1,10 @@
+name: deeptools
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - bioconda::deeptools ==3.5.4
+  - conda-forge::python ==3.10
+  # deepTools 3.5.4 still uses np.NAN, which was removed in NumPy 2.x
+  - conda-forge::numpy <2

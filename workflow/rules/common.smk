@@ -26,4 +26,15 @@ def allInput():
     inputList.append("results/gc_rich_bg/gc_rich_bg_prepared.bed")
     inputList.append("results/gc_rich_bg/gc_rich_bg_selection_summary.tsv")
 
+    # smk: g4_tss (Tasks 1-8)
+    inputList.append("results/g4_tss/tss_group_annotation.tsv")
+    inputList.append("results/g4_tss/gene_expression_by_group.tsv")
+    inputList.append("results/g4_tss/expression_group_statistics.tsv")
+    inputList.append("results/g4_tss/expression_violin_by_group.pdf")
+    inputList.append("results/g4_tss/rnaseq_tss_metaprofile.pdf")
+    inputList.append("results/g4_tss/decile_enrichment_plot.pdf")
+    inputList.append("results/g4_tss/uv_volcano_by_group.pdf")
+    inputList.append("results/g4_tss/structure_class_by_expression_class.pdf")
+    inputList.append("results/g4_tss/g4_tss_transcription_report.html")
+
     return inputList
