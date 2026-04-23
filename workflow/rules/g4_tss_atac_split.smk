@@ -129,7 +129,7 @@ rule g4_tss_atac_split_build_annotation:
     input:
         gene_table=rules.g4_tss_extract_canonical_tss.output.gene_table,
         g4_intersect=rules.g4_tss_atac_split_intersect_g4.output,
-        gc_bg_intersect=rules.g4_tss_intersect_gc_bg.output,
+        gc_bg_bed="results/gc_rich_bg_promoter/gc_rich_bg_promoter_sampled.bed",
     output:
         tsv="results/g4_tss_atac_split/{timepoint}/tss_group_annotation.tsv",
     log:
@@ -142,7 +142,7 @@ rule g4_tss_atac_split_build_annotation:
         python3 workflow/scripts/g4_tss_build_annotation.py \
           --gene-table {input.gene_table} \
           --g4-intersect {input.g4_intersect} \
-          --gc-bg-intersect {input.gc_bg_intersect} \
+          --gc-bg-bed {input.gc_bg_bed} \
           --out-tsv {output.tsv} \
           --log {log} &&
         echo "`date -R`: Success!" ||
@@ -317,7 +317,7 @@ rule g4_tss_atac_split_decile_analysis:
         by_group=rules.g4_tss_atac_split_baseline_expression.output.by_group,
         windows=rules.g4_tss_slop_windows.output.windows,
         g4_merged=rules.g4_tss_atac_split_filter_g4.output.bed,
-        gc_bg="results/gc_rich_bg/gc_rich_bg_prepared.bed",
+        gc_bg="results/gc_rich_bg_promoter/gc_rich_bg_promoter_sampled.bed",
     output:
         deciles="results/g4_tss_atac_split/{timepoint}/expression_deciles.tsv",
         overlap_fractions="results/g4_tss_atac_split/{timepoint}/decile_overlap_fractions.tsv",

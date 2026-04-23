@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Task 5: Quantify G4 and GC-background occupancy across baseline expression deciles.
+"""Task 5: Quantify G4 and GC-background membership across baseline expression deciles.
 
 Assigns genes to expression deciles (0 = silent, 1-10 = expressed low to high),
-computes overlap fractions with merged G4 peaks and GC-rich background per decile,
+computes fractions with merged G4 peaks and GC-rich promoter control per decile,
 calculates Spearman correlations, and plots the trend.
 """
 
@@ -25,7 +25,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--tss-windows-bed", required=True,
                    help="canonical_tss_windows_1kb.bed")
     p.add_argument("--g4-merged-bed", required=True)
-    p.add_argument("--gc-bg-bed", required=True)
+    p.add_argument("--gc-bg-bed", required=True,
+                   help="Sampled promoter-control BED; gene IDs are read from column 4.")
     p.add_argument("--analysis-label", default=None)
     p.add_argument("--g4-label", default="G4 merged")
     p.add_argument("--out-deciles", required=True)
@@ -56,6 +57,11 @@ def bedtools_intersect_fraction(windows_bed: str, peaks_bed: str) -> dict[str, b
         count = int(fields[-1])
         overlaps[gene_id] = count > 0
     return overlaps
+
+
+def read_gc_bg_members(gc_bg_bed: str) -> set[str]:
+    df = pd.read_csv(gc_bg_bed, sep="\t", header=None, usecols=[3], names=["gene_id"])
+    return {normalize_gene_id(gene_id) for gene_id in df["gene_id"].astype(str)}
 
 
 def main() -> None:
@@ -93,11 +99,11 @@ def main() -> None:
     # compute overlaps
     log("Computing G4 overlaps...")
     g4_overlaps = bedtools_intersect_fraction(args.tss_windows_bed, args.g4_merged_bed)
-    log("Computing GC-bg overlaps...")
-    gc_overlaps = bedtools_intersect_fraction(args.tss_windows_bed, args.gc_bg_bed)
+    log("Loading GC-bg promoter-control membership...")
+    gc_members = read_gc_bg_members(args.gc_bg_bed)
 
     expr["has_g4"] = expr["gene_id_norm"].map(g4_overlaps).fillna(False)
-    expr["has_gc_bg"] = expr["gene_id_norm"].map(gc_overlaps).fillna(False)
+    expr["has_gc_bg"] = expr["gene_id_norm"].isin(gc_members)
     expr.drop(columns=["gene_id_norm"]).to_csv(args.out_deciles, sep="\t", index=False)
 
     frac_rows = []
@@ -137,15 +143,15 @@ def main() -> None:
     ax.plot(x, frac_df["g4_overlap_fraction"].values * 100, "o-",
             color="#d62728", label=f"{args.g4_label} (ρ={rho_g4:.2f})")
     ax.plot(x, frac_df["gc_bg_overlap_fraction"].values * 100, "s--",
-            color="#ff7f0e", label=f"GC-rich BG (ρ={rho_gc:.2f})")
+            color="#ff7f0e", label=f"GC-rich promoter BG (ρ={rho_gc:.2f})")
 
     ax.axvline(0.5, color="gray", lw=0.8, ls=":")
     ax.set_xticks(range(0, 11))
     ax.set_xticklabels(["Silent"] + [str(i) for i in range(1, 11)])
     ax.set_xlabel("Expression decile (0 = silent)")
-    ax.set_ylabel("Genes with TSS overlap (%)")
+    ax.set_ylabel("Genes in set (%)")
     title_prefix = f"{args.analysis_label}: " if args.analysis_label else ""
-    ax.set_title(f"{title_prefix}G4 and GC-bg overlap fraction across expression deciles")
+    ax.set_title(f"{title_prefix}G4 and GC-bg fraction across expression deciles")
     ax.grid(axis="y", color="#d9d9d9", lw=0.6)
     ax.legend(fontsize=9)
     plt.tight_layout()

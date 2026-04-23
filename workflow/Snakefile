@@ -24,3 +24,5 @@ include: "rules/g4chip_g4cuttag_merge.smk"  # Merge g4chip and g4cuttag interval
 include: "rules/rnaseq.smk"  # RNA-seq quantification and DESeq2 time-series
 include: "rules/g4_tss.smk"  # G4-TSS transcription analysis (Tasks 1-8)
 include: "rules/g4_tss_atac_split.smk"  # ATAC-filtered G4-TSS transcription analysis
+include: "rules/g4_tss_uv.smk"  # G4-TSS UV magnitude and direction analysis (Tasks 1-7)
+include: "rules/g4_tss_damage_uv.smk"  # G4-TSS UV lesion burden and suppression analysis (Tasks 1-7)

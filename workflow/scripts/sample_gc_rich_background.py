@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sample a GC-rich genomic background and remove OQS-overlapping loci."""
+"""Sample a GC-rich genomic background and remove excluded loci."""
 
 from __future__ import annotations
 
@@ -29,12 +29,18 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Prepared OQS BED to exclude after sampling. Repeat for multiple files.",
     )
+    p.add_argument(
+        "--g4-bed",
+        default=None,
+        help="Merged G4 BED to exclude after sampling.",
+    )
     p.add_argument("--tile-size", type=int, default=150)
     p.add_argument("--gc-threshold", type=float, default=0.28)
     p.add_argument("--sample-size", type=int, default=300000)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--out-sampled-bed", required=True)
-    p.add_argument("--out-no-oqs-bed", required=True)
+    p.add_argument("--out-filtered-bed", default=None)
+    p.add_argument("--out-no-oqs-bed", default=None, help=argparse.SUPPRESS)
     p.add_argument("--out-summary-tsv", required=True)
     return p.parse_args()
 
@@ -214,33 +220,69 @@ def reservoir_sample_tiles(
     return reservoir, counts
 
 
-def filter_sampled_against_oqs(
+def has_interval_overlap(
+    intervals: list[tuple[int, int]],
+    start: int,
+    end: int,
+    interval_idx: int,
+) -> tuple[bool, int]:
+    while interval_idx < len(intervals) and intervals[interval_idx][1] <= start:
+        interval_idx += 1
+    if interval_idx < len(intervals):
+        cur_start, cur_end = intervals[interval_idx]
+        if cur_start < end and cur_end > start:
+            return True, interval_idx
+    return False, interval_idx
+
+
+def filter_sampled_against_exclusions(
     sampled_tiles: list[tuple[str, int, int, float]],
     oqs_map: dict[str, list[tuple[int, int]]],
-) -> tuple[list[tuple[str, int, int, float]], int]:
+    g4_map: dict[str, list[tuple[int, int]]],
+) -> tuple[list[tuple[str, int, int, float]], dict[str, int]]:
     retained: list[tuple[str, int, int, float]] = []
-    dropped = 0
+    stats = {
+        "n_tiles_oqs_only_dropped": 0,
+        "n_tiles_g4_only_dropped": 0,
+        "n_tiles_oqs_and_g4_dropped": 0,
+    }
     tiles_by_chrom: dict[str, list[tuple[str, int, int, float]]] = {chrom: [] for chrom in TARGET_CHROMS}
     for tile in sampled_tiles:
         tiles_by_chrom[tile[0]].append(tile)
 
     for chrom in TARGET_CHROMS:
         tiles = sorted(tiles_by_chrom[chrom], key=lambda row: (row[1], row[2]))
-        intervals = oqs_map.get(chrom, [])
-        interval_idx = 0
+        oqs_intervals = oqs_map.get(chrom, [])
+        g4_intervals = g4_map.get(chrom, [])
+        oqs_idx = 0
+        g4_idx = 0
         for record in tiles:
             _, start, end, _ = record
-            while interval_idx < len(intervals) and intervals[interval_idx][1] <= start:
-                interval_idx += 1
-            if interval_idx < len(intervals):
-                oqs_start, oqs_end = intervals[interval_idx]
-                if oqs_start < end and oqs_end > start:
-                    dropped += 1
-                    continue
+            hit_oqs, oqs_idx = has_interval_overlap(oqs_intervals, start, end, oqs_idx)
+            hit_g4, g4_idx = has_interval_overlap(g4_intervals, start, end, g4_idx)
+            if hit_oqs or hit_g4:
+                if hit_oqs and hit_g4:
+                    stats["n_tiles_oqs_and_g4_dropped"] += 1
+                elif hit_oqs:
+                    stats["n_tiles_oqs_only_dropped"] += 1
+                else:
+                    stats["n_tiles_g4_only_dropped"] += 1
+                continue
             retained.append(record)
 
     retained.sort(key=lambda row: (CHROM_ORDER[row[0]], row[1], row[2]))
-    return retained, dropped
+    stats["n_tiles_excluded_any"] = (
+        stats["n_tiles_oqs_only_dropped"]
+        + stats["n_tiles_g4_only_dropped"]
+        + stats["n_tiles_oqs_and_g4_dropped"]
+    )
+    stats["n_tiles_oqs_dropped"] = (
+        stats["n_tiles_oqs_only_dropped"] + stats["n_tiles_oqs_and_g4_dropped"]
+    )
+    stats["n_tiles_g4_dropped"] = (
+        stats["n_tiles_g4_only_dropped"] + stats["n_tiles_oqs_and_g4_dropped"]
+    )
+    return retained, stats
 
 
 def assign_names(records: list[tuple[str, int, int, float]]) -> list[tuple[str, int, int, str, float, str]]:
@@ -280,12 +322,17 @@ def main() -> None:
     fai_path = Path(args.genome_fai)
     blacklist_path = Path(args.blacklist_bed)
     oqs_paths = [Path(path) for path in args.oqs_beds]
+    g4_paths = [Path(args.g4_bed)] if args.g4_bed else []
+    filtered_bed = args.out_filtered_bed or args.out_no_oqs_bed
+    if not filtered_bed:
+        raise ValueError("One of --out-filtered-bed or --out-no-oqs-bed is required.")
 
     if not ref_path.exists():
         raise FileNotFoundError(f"Missing reference FASTA: {ref_path}")
     chrom_sizes = read_fai(fai_path)
     blacklist_map = read_merged_bed([blacklist_path])
     oqs_map = read_merged_bed(oqs_paths)
+    g4_map = read_merged_bed(g4_paths) if g4_paths else {chrom: [] for chrom in TARGET_CHROMS}
 
     sampled_tiles, counts = reservoir_sample_tiles(
         fasta_path=ref_path,
@@ -298,13 +345,13 @@ def main() -> None:
     )
     sampled_tiles.sort(key=lambda row: (CHROM_ORDER[row[0]], row[1], row[2]))
 
-    retained_tiles, oqs_dropped = filter_sampled_against_oqs(sampled_tiles, oqs_map)
+    retained_tiles, filter_stats = filter_sampled_against_exclusions(sampled_tiles, oqs_map, g4_map)
 
     sampled_named = assign_names(sampled_tiles)
-    sampled_no_oqs_named = assign_names(retained_tiles)
+    filtered_named = assign_names(retained_tiles)
 
     write_bed(sampled_named, Path(args.out_sampled_bed))
-    write_bed(sampled_no_oqs_named, Path(args.out_no_oqs_bed))
+    write_bed(filtered_named, Path(filtered_bed))
 
     summary = {
         "tile_size_bp": int(args.tile_size),
@@ -316,8 +363,13 @@ def main() -> None:
         "n_tiles_non_acgt_dropped": int(counts["n_tiles_non_acgt_dropped"]),
         "n_tiles_gc_pass": int(counts["n_tiles_gc_pass"]),
         "n_tiles_sampled": len(sampled_named),
-        "n_tiles_oqs_dropped": int(oqs_dropped),
-        "n_tiles_oqs_retained": len(sampled_no_oqs_named),
+        "n_tiles_oqs_only_dropped": int(filter_stats["n_tiles_oqs_only_dropped"]),
+        "n_tiles_g4_only_dropped": int(filter_stats["n_tiles_g4_only_dropped"]),
+        "n_tiles_oqs_and_g4_dropped": int(filter_stats["n_tiles_oqs_and_g4_dropped"]),
+        "n_tiles_oqs_dropped": int(filter_stats["n_tiles_oqs_dropped"]),
+        "n_tiles_g4_dropped": int(filter_stats["n_tiles_g4_dropped"]),
+        "n_tiles_excluded_any": int(filter_stats["n_tiles_excluded_any"]),
+        "n_tiles_filtered_retained": len(filtered_named),
     }
     write_summary(Path(args.out_summary_tsv), summary)
 

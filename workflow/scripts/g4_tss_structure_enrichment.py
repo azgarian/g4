@@ -235,8 +235,9 @@ def main() -> None:
         log(f"Written: {args.out_enrichment_stats}")
 
     # --- Stacked bar chart ---
+    plot_class_order = [cls for cls in CLASS_ORDER if cls != "silent"]
     pivot = struct_df.pivot(index="structure", columns="expression_class",
-                            values="fraction_in_class").reindex(columns=CLASS_ORDER)
+                            values="fraction_in_class").reindex(columns=plot_class_order)
     if pivot.empty:
         log("No structure data to plot.")
     else:

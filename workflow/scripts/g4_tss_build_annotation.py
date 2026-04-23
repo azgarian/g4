@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Task 1: Build TSS group annotation table after bedtools intersect.
+"""Task 1: Build TSS group annotation table from G4 overlap and GC-bg membership.
 
-Reads the gene_name side table and two bedtools-intersect -c outputs
-(G4 overlap counts and GC-background overlap counts), then assigns
-each gene to G4_TSS / GC_bg_TSS / No_overlap using the precedence rule.
+Reads the gene_name side table, a bedtools-intersect -c output for G4 overlap,
+and either a GC-background intersect file or a sampled promoter-control BED.
+Genes are assigned to G4_TSS / GC_bg_TSS / No_overlap using the precedence rule.
 """
 
 from __future__ import annotations
@@ -20,8 +20,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--gene-table", required=True, help="TSV from g4_tss_canonical_tss.py")
     p.add_argument("--g4-intersect", required=True,
                    help="Output of bedtools intersect -c with G4 peaks (BED6+count)")
-    p.add_argument("--gc-bg-intersect", required=True,
-                   help="Output of bedtools intersect -c with GC-rich background (BED6+count)")
+    gc_group = p.add_mutually_exclusive_group(required=True)
+    gc_group.add_argument(
+        "--gc-bg-intersect",
+        help="Output of bedtools intersect -c with GC-rich background (BED6+count)",
+    )
+    gc_group.add_argument(
+        "--gc-bg-bed",
+        help="BED of sampled promoter-control windows; promoter membership is read from column 4.",
+    )
     p.add_argument("--out-tsv", required=True, help="Output annotation TSV")
     p.add_argument("--log", default=None)
     return p.parse_args()
@@ -37,6 +44,13 @@ def read_intersect_counts(path: str) -> pd.Series:
     return pd.Series(count.values, index=gene_id.values)
 
 
+def read_gc_bg_gene_members(path: str) -> pd.Series:
+    """Return a Series: gene_id -> 1 for promoter-control members."""
+    df = pd.read_csv(path, sep="\t", header=None, usecols=[3], names=["gene_id"])
+    gene_id = df["gene_id"].astype(str)
+    return pd.Series(1, index=gene_id.values)
+
+
 def main() -> None:
     args = parse_args()
     log_fh = open(args.log, "w") if args.log else sys.stdout
@@ -47,7 +61,10 @@ def main() -> None:
     gene_df = pd.read_csv(args.gene_table, sep="\t")
 
     g4_counts = read_intersect_counts(args.g4_intersect)
-    gc_counts = read_intersect_counts(args.gc_bg_intersect)
+    if args.gc_bg_intersect:
+        gc_counts = read_intersect_counts(args.gc_bg_intersect)
+    else:
+        gc_counts = read_gc_bg_gene_members(args.gc_bg_bed)
 
     gene_df = gene_df.set_index("gene_id")
     gene_df["has_g4_tss"] = (g4_counts.reindex(gene_df.index).fillna(0) > 0).astype(int)

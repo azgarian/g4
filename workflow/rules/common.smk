@@ -25,6 +25,8 @@ def allInput():
     # smk: gc_rich_bg
     inputList.append("results/gc_rich_bg/gc_rich_bg_prepared.bed")
     inputList.append("results/gc_rich_bg/gc_rich_bg_selection_summary.tsv")
+    inputList.append("results/gc_rich_bg_promoter/gc_rich_bg_promoter_sampled.bed")
+    inputList.append("results/gc_rich_bg_promoter/gc_rich_bg_promoter_selection_summary.tsv")
 
     # smk: g4_tss (Tasks 1-8)
     inputList.append("results/g4_tss/tss_group_annotation.tsv")
@@ -50,5 +52,11 @@ def allInput():
         inputList.append(
             f"results/g4_tss_atac_split/{timepoint}/g4_tss_atac_split_report.html"
         )
+
+    # smk: g4_tss_uv (Tasks 1-7 — UV magnitude and direction analysis)
+    inputList.append("results/g4_tss_uv/g4_uv_magnitude_direction_report.html")
+
+    # smk: g4_tss_damage_uv (Tasks 1-7 — UV lesion burden and suppression analysis)
+    inputList.append("results/g4_tss_damage_uv/g4_promoter_damage_suppression_report.html")
 
     return inputList

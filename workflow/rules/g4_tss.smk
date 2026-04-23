@@ -5,7 +5,7 @@ Answers the question: Are G4s at TSSs linked to active transcription?
 
 Prerequisites (must already exist):
   results/g4chip_g4cuttag/g4_hela_chip_cuttag_merged.bed
-  results/gc_rich_bg/gc_rich_bg_prepared.bed
+  results/gc_rich_bg_promoter/gc_rich_bg_promoter_sampled.bed
   results/g4chip/g4_hela_peaks_prepared.tsv
   results/g4cuttag/g4_hela_peaks_prepared.tsv
   resources/ref_genomes/hg38_rnaseq_v35/gencode.v35.annotation.gtf
@@ -93,38 +93,13 @@ rule g4_tss_intersect_g4:
         """
 
 
-# ─── Task 1d: Intersect promoter windows with GC-rich background ──────────────
-
-rule g4_tss_intersect_gc_bg:
-    input:
-        windows=rules.g4_tss_slop_windows.output.windows,
-        gc_bg="results/gc_rich_bg/gc_rich_bg_prepared.bed",
-    output:
-        "results/g4_tss/windows_gc_bg_intersect.bed",
-    log:
-        "logs/g4_tss/intersect_gc_bg.log",
-    conda:
-        "../envs/g4_tss.yaml"
-    shell:
-        """
-        (echo "`date -R`: Intersecting TSS windows with GC-rich background (-c)..." &&
-        bedtools intersect \
-          -c \
-          -a {input.windows} \
-          -b {input.gc_bg} \
-          > {output} &&
-        echo "`date -R`: Success!" ||
-        {{ echo "`date -R`: Process failed..."; exit 1; }} ) > {log} 2>&1
-        """
-
-
-# ─── Task 1e: Build final annotation table with group assignments ──────────────
+# ─── Task 1d: Build final annotation table with group assignments ──────────────
 
 rule g4_tss_build_annotation:
     input:
         gene_table=rules.g4_tss_extract_canonical_tss.output.gene_table,
         g4_intersect=rules.g4_tss_intersect_g4.output,
-        gc_bg_intersect=rules.g4_tss_intersect_gc_bg.output,
+        gc_bg_bed="results/gc_rich_bg_promoter/gc_rich_bg_promoter_sampled.bed",
     output:
         tsv="results/g4_tss/tss_group_annotation.tsv",
     log:
@@ -137,7 +112,7 @@ rule g4_tss_build_annotation:
         python3 workflow/scripts/g4_tss_build_annotation.py \
           --gene-table {input.gene_table} \
           --g4-intersect {input.g4_intersect} \
-          --gc-bg-intersect {input.gc_bg_intersect} \
+          --gc-bg-bed {input.gc_bg_bed} \
           --out-tsv {output.tsv} \
           --log {log} &&
         echo "`date -R`: Success!" ||
@@ -308,7 +283,7 @@ rule g4_tss_decile_analysis:
         by_group=rules.g4_tss_baseline_expression.output.by_group,
         windows=rules.g4_tss_slop_windows.output.windows,
         g4_merged="results/g4chip_g4cuttag/g4_hela_chip_cuttag_merged.bed",
-        gc_bg="results/gc_rich_bg/gc_rich_bg_prepared.bed",
+        gc_bg="results/gc_rich_bg_promoter/gc_rich_bg_promoter_sampled.bed",
     output:
         deciles="results/g4_tss/expression_deciles.tsv",
         overlap_fractions="results/g4_tss/decile_overlap_fractions.tsv",

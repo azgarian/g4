@@ -8,6 +8,7 @@ software-deployment-method: "conda"
 printshellcmds: True
 keep-going: True
 rerun-incomplete: True
+# rerun-triggers: "code"
 rerun-triggers: "mtime"
 # rerun-triggers: "input"
 
