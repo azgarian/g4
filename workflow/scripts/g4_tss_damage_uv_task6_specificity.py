@@ -220,20 +220,66 @@ def plot_interaction(results: pd.DataFrame, out_path: str) -> None:
         plt.close()
         return
 
+    results = results.copy()
+    results["timepoint"] = pd.to_numeric(results["timepoint"], errors="coerce")
+    results = results.dropna(subset=["timepoint", "coef"])
+    results = results.sort_values(["timepoint", "product", "interaction_term"])
+
+    if results.empty:
+        plt.figure()
+        plt.text(0.5, 0.5, "No plottable interaction results", ha="center", va="center")
+        plt.savefig(out_path)
+        plt.close()
+        return
+
     fig, ax = plt.subplots(figsize=(7, 5))
-    colors = {"G4_TSS": "#1f77b4", "No_overlap": "#7f7f7f"}
-    tps = results["timepoint"].unique() if "timepoint" in results.columns else []
-    for group, color in colors.items():
-        g = results[results.get("group", pd.Series()) == group] if "group" in results.columns else pd.DataFrame()
-        if g.empty:
+    colors = {"CPD": "#1f77b4", "64-PP": "#d62728"}
+    products = [p for p in ["CPD", "64-PP"] if p in results["product"].unique()]
+    if not products:
+        products = list(results["product"].dropna().unique())
+
+    offsets = np.linspace(-0.12, 0.12, num=max(len(products), 1))
+    for offset, product in zip(offsets, products):
+        sub = results[results["product"] == product].copy()
+        if sub.empty:
             continue
-        ax.plot(g["timepoint"], g.get("coef_damage", pd.Series()), marker="o",
-                label=group, color=color, linewidth=1.5)
+        x = sub["timepoint"].to_numpy(dtype=float) + offset
+        y = sub["coef"].to_numpy(dtype=float)
+        yerr = sub["se"].to_numpy(dtype=float) if "se" in sub.columns else None
+
+        ax.errorbar(
+            x,
+            y,
+            yerr=yerr,
+            fmt="o-",
+            label=product,
+            color=colors.get(product, "#4c4c4c"),
+            linewidth=1.5,
+            capsize=3,
+            markersize=6,
+        )
+
+        if "pvalue" in sub.columns:
+            for xi, yi, pval in zip(x, y, sub["pvalue"]):
+                if pd.isna(pval):
+                    continue
+                if pval < 0.001:
+                    mark = "***"
+                elif pval < 0.01:
+                    mark = "**"
+                elif pval < 0.05:
+                    mark = "*"
+                else:
+                    mark = "ns"
+                ax.text(xi, yi, mark, ha="center", va="bottom", fontsize=8)
+
     ax.axhline(0, color="grey", linewidth=0.5, linestyle="--")
     ax.set_xlabel("Timepoint (min)")
-    ax.set_ylabel("Damage coefficient (lfc ~ damage)")
-    ax.set_title("Promoter-group specificity: damage effect by group")
-    ax.legend()
+    ax.set_ylabel("Interaction coefficient")
+    ax.set_title("Promoter-group specificity interaction")
+    ax.set_xticks(sorted(results["timepoint"].unique()))
+    ax.set_xticklabels([str(int(tp)) for tp in sorted(results["timepoint"].unique())])
+    ax.legend(title="Product")
     plt.tight_layout()
     plt.savefig(out_path, bbox_inches="tight")
     plt.close()

@@ -43,6 +43,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--out-fc-stats", required=True)
     p.add_argument("--out-fc-plot", required=True)
     p.add_argument("--out-volcano-plot", required=True)
+    p.add_argument("--out-lrt-sig-fc-stats", default=None,
+                   help="Fold-change stats restricted to LRT-significant genes (padj < 0.05)")
+    p.add_argument("--out-lrt-sig-fc-plot", default=None,
+                   help="Fold-change violin plot restricted to LRT-significant genes")
+    p.add_argument("--out-lrt-sig-volcano-plot", default=None,
+                   help="Volcano plot restricted to LRT-significant genes")
     p.add_argument("--log", default=None)
     args = p.parse_args()
     if args.pairwise_results is None:
@@ -61,6 +67,74 @@ def infer_contrast_parts(pairwise_df: pd.DataFrame) -> tuple[str | None, str | N
         if not numerator.empty and not denominator.empty:
             return str(int(numerator.iloc[0])), str(int(denominator.iloc[0]))
     return None, None
+
+
+def compute_fc_stats(merged: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for grp in GROUP_ORDER:
+        sub = merged[(merged["group"] == grp) & merged["log2FoldChange"].notna()].copy()
+        sub_sig = sub[sub["pw_padj"] < 0.05]
+        n = len(sub)
+        n_repressed = (sub_sig["log2FoldChange"] > 0.5).sum()
+        n_induced = (sub_sig["log2FoldChange"] < -0.5).sum()
+        fc_vals = sub["log2FoldChange"].values
+        rows.append({
+            "group": grp,
+            "n_genes": n,
+            "mean_log2FC": fc_vals.mean() if n > 0 else np.nan,
+            "median_log2FC": np.median(fc_vals) if n > 0 else np.nan,
+            "n_repressed_UV": int(n_repressed),
+            "n_induced_UV": int(n_induced),
+            "fraction_repressed": n_repressed / n if n > 0 else np.nan,
+            "fraction_induced": n_induced / n if n > 0 else np.nan,
+        })
+    return pd.DataFrame(rows)
+
+
+def plot_fc(merged: pd.DataFrame, out_path: str, contrast_label: str,
+            numerator_tp: str | None, title_prefix: str) -> None:
+    plot_df = merged[merged["log2FoldChange"].notna()].copy()
+    fig, ax = plt.subplots(figsize=(6, 5))
+    sns.violinplot(data=plot_df, x="group", y="log2FoldChange",
+                   order=GROUP_ORDER, palette=GROUP_PALETTE,
+                   inner=None, linewidth=0.8, alpha=0.7, ax=ax)
+    sns.boxplot(data=plot_df, x="group", y="log2FoldChange",
+                order=GROUP_ORDER, width=0.15, fliersize=1.5,
+                linewidth=0.8, color="white", ax=ax)
+    ax.axhline(0, color="black", lw=0.8, ls="--")
+    ax.set_xlabel("")
+    ax.set_ylabel(f"log₂ fold change ({contrast_label})")
+    title = (
+        f"{title_prefix}UV-induced fold change by promoter group\n"
+        f"(positive = higher at {numerator_tp} min)"
+        if numerator_tp is not None
+        else f"{title_prefix}UV-induced fold change by promoter group"
+    )
+    ax.set_title(title)
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def plot_volcano(merged: pd.DataFrame, out_path: str, contrast_label: str,
+                 title_prefix: str) -> None:
+    vdf = merged[merged["log2FoldChange"].notna() & merged["pw_padj"].notna()].copy()
+    vdf["neg_log10_padj"] = -np.log10(vdf["pw_padj"].clip(lower=1e-300))
+    fig, ax = plt.subplots(figsize=(7, 5))
+    for grp in GROUP_ORDER:
+        sub = vdf[vdf["group"] == grp]
+        ax.scatter(sub["log2FoldChange"], sub["neg_log10_padj"],
+                   s=3, alpha=0.4, color=GROUP_PALETTE[grp], label=grp, rasterized=True)
+    ax.axhline(-np.log10(0.05), color="gray", lw=0.8, ls="--")
+    ax.axvline(0.5, color="gray", lw=0.5, ls=":")
+    ax.axvline(-0.5, color="gray", lw=0.5, ls=":")
+    ax.set_xlabel(f"log₂FC ({contrast_label})")
+    ax.set_ylabel("-log₁₀(adj. p-value)")
+    ax.set_title(f"{title_prefix}UV-response volcano ({contrast_label})")
+    ax.legend(markerscale=3, fontsize=8)
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
 
 
 def main() -> None:
@@ -131,32 +205,13 @@ def main() -> None:
     lrt_df.to_csv(args.out_lrt_summary, sep="\t", index=False)
     log(f"Written: {args.out_lrt_summary}")
 
-    # --- Fold-change stats per group ---
-    fc_rows = []
-    for grp in GROUP_ORDER:
-        sub = merged[(merged["group"] == grp) & merged["log2FoldChange"].notna()].copy()
-        sub_sig = sub[sub["pw_padj"] < 0.05]
-        n = len(sub)
-        n_repressed = ((sub_sig["log2FoldChange"] > 0.5)).sum()
-        n_induced = ((sub_sig["log2FoldChange"] < -0.5)).sum()
+    # --- All-genes analyses ---
+    title_prefix = f"{args.analysis_label}: " if args.analysis_label else ""
 
-        # compare FC distributions
-        fc_vals = sub["log2FoldChange"].values
-        fc_rows.append({
-            "group": grp,
-            "n_genes": n,
-            "mean_log2FC": fc_vals.mean() if n > 0 else np.nan,
-            "median_log2FC": np.median(fc_vals) if n > 0 else np.nan,
-            "n_repressed_UV": int(n_repressed),
-            "n_induced_UV": int(n_induced),
-            "fraction_repressed": n_repressed / n if n > 0 else np.nan,
-            "fraction_induced": n_induced / n if n > 0 else np.nan,
-        })
-    fc_df = pd.DataFrame(fc_rows)
+    fc_df = compute_fc_stats(merged)
     fc_df.to_csv(args.out_fc_stats, sep="\t", index=False)
     log(f"Written: {args.out_fc_stats}")
 
-    # Kruskal-Wallis on fold-changes
     fc_by_grp = [
         merged[(merged["group"] == g) & merged["log2FoldChange"].notna()]["log2FoldChange"].values
         for g in GROUP_ORDER
@@ -165,48 +220,42 @@ def main() -> None:
         kw_stat, kw_p = stats.kruskal(*fc_by_grp)
         log(f"Kruskal-Wallis on {contrast_label} log2FC: H={kw_stat:.4f}, p={kw_p:.4e}")
 
-    # --- Violin + boxplot of fold changes ---
-    plot_df = merged[merged["log2FoldChange"].notna()].copy()
-    fig, ax = plt.subplots(figsize=(6, 5))
-    sns.violinplot(data=plot_df, x="group", y="log2FoldChange",
-                   order=GROUP_ORDER, palette=GROUP_PALETTE,
-                   inner=None, linewidth=0.8, alpha=0.7, ax=ax)
-    sns.boxplot(data=plot_df, x="group", y="log2FoldChange",
-                order=GROUP_ORDER, width=0.15, fliersize=1.5,
-                linewidth=0.8, color="white", ax=ax)
-    ax.axhline(0, color="black", lw=0.8, ls="--")
-    ax.set_xlabel("")
-    ax.set_ylabel(f"log₂ fold change ({contrast_label})")
-    title_prefix = f"{args.analysis_label}: " if args.analysis_label else ""
-    ax.set_title(
-        f"{title_prefix}UV-induced fold change by promoter group\n"
-        f"(positive = higher at {numerator_tp} min)"
-        if numerator_tp is not None
-        else f"{title_prefix}UV-induced fold change by promoter group"
-    )
-    plt.tight_layout()
-    fig.savefig(args.out_fc_plot, dpi=150)
-    plt.close(fig)
+    plot_fc(merged, args.out_fc_plot, contrast_label, numerator_tp, title_prefix)
+    log(f"Written: {args.out_fc_plot}")
 
-    # --- Volcano plot ---
-    vdf = merged[merged["log2FoldChange"].notna() & merged["pw_padj"].notna()].copy()
-    vdf["neg_log10_padj"] = -np.log10(vdf["pw_padj"].clip(lower=1e-300))
+    plot_volcano(merged, args.out_volcano_plot, contrast_label, title_prefix)
+    log(f"Written: {args.out_volcano_plot}")
 
-    fig, ax = plt.subplots(figsize=(7, 5))
-    for grp in GROUP_ORDER:
-        sub = vdf[vdf["group"] == grp]
-        ax.scatter(sub["log2FoldChange"], sub["neg_log10_padj"],
-                   s=3, alpha=0.4, color=GROUP_PALETTE[grp], label=grp, rasterized=True)
-    ax.axhline(-np.log10(0.05), color="gray", lw=0.8, ls="--")
-    ax.axvline(0.5, color="gray", lw=0.5, ls=":")
-    ax.axvline(-0.5, color="gray", lw=0.5, ls=":")
-    ax.set_xlabel(f"log₂FC ({contrast_label})")
-    ax.set_ylabel("-log₁₀(adj. p-value)")
-    ax.set_title(f"{title_prefix}UV-response volcano ({contrast_label})")
-    ax.legend(markerscale=3, fontsize=8)
-    plt.tight_layout()
-    fig.savefig(args.out_volcano_plot, dpi=150)
-    plt.close(fig)
+    # --- LRT-significant subset analyses ---
+    lrt_sig_outputs = [args.out_lrt_sig_fc_stats, args.out_lrt_sig_fc_plot,
+                       args.out_lrt_sig_volcano_plot]
+    if any(o is not None for o in lrt_sig_outputs):
+        lrt_sig = merged[merged["lrt_padj"] < 0.05].copy()
+        n_lrt_sig = len(lrt_sig)
+        log(f"LRT-significant genes (padj < 0.05): {n_lrt_sig:,}")
+        for grp in GROUP_ORDER:
+            n_grp = (lrt_sig["group"] == grp).sum()
+            log(f"  {grp}: {n_grp:,}")
+
+        lrt_sig_prefix = f"{args.analysis_label} (LRT sig): " if args.analysis_label else "LRT sig: "
+
+        if args.out_lrt_sig_fc_stats:
+            Path(args.out_lrt_sig_fc_stats).parent.mkdir(parents=True, exist_ok=True)
+            lrt_sig_fc_df = compute_fc_stats(lrt_sig)
+            lrt_sig_fc_df.to_csv(args.out_lrt_sig_fc_stats, sep="\t", index=False)
+            log(f"Written: {args.out_lrt_sig_fc_stats}")
+
+        if args.out_lrt_sig_fc_plot:
+            Path(args.out_lrt_sig_fc_plot).parent.mkdir(parents=True, exist_ok=True)
+            plot_fc(lrt_sig, args.out_lrt_sig_fc_plot, contrast_label,
+                    numerator_tp, lrt_sig_prefix)
+            log(f"Written: {args.out_lrt_sig_fc_plot}")
+
+        if args.out_lrt_sig_volcano_plot:
+            Path(args.out_lrt_sig_volcano_plot).parent.mkdir(parents=True, exist_ok=True)
+            plot_volcano(lrt_sig, args.out_lrt_sig_volcano_plot, contrast_label,
+                         lrt_sig_prefix)
+            log(f"Written: {args.out_lrt_sig_volcano_plot}")
 
     if log_fh:
         log_fh.close()

@@ -104,6 +104,10 @@ def main() -> None:
 
     expr["has_g4"] = expr["gene_id_norm"].map(g4_overlaps).fillna(False)
     expr["has_gc_bg"] = expr["gene_id_norm"].isin(gc_members)
+    if "group" in expr.columns:
+        expr["has_no_overlap"] = expr["group"].eq("No_overlap")
+    else:
+        expr["has_no_overlap"] = ~(expr["has_g4"] | expr["has_gc_bg"])
     expr.drop(columns=["gene_id_norm"]).to_csv(args.out_deciles, sep="\t", index=False)
 
     frac_rows = []
@@ -117,6 +121,7 @@ def main() -> None:
             "n_genes": n,
             "g4_overlap_fraction": sub["has_g4"].mean(),
             "gc_bg_overlap_fraction": sub["has_gc_bg"].mean(),
+            "no_overlap_fraction": sub["has_no_overlap"].mean(),
         })
     frac_df = pd.DataFrame(frac_rows)
     frac_df.to_csv(args.out_overlap_fractions, sep="\t", index=False)
@@ -127,13 +132,17 @@ def main() -> None:
                                     expressed_deciles["g4_overlap_fraction"])
     rho_gc, p_gc = stats.spearmanr(expressed_deciles["decile"],
                                     expressed_deciles["gc_bg_overlap_fraction"])
+    rho_no, p_no = stats.spearmanr(expressed_deciles["decile"],
+                                    expressed_deciles["no_overlap_fraction"])
 
     log(f"Spearman G4: rho={rho_g4:.4f}, p={p_g4:.4e}")
     log(f"Spearman GC-bg: rho={rho_gc:.4f}, p={p_gc:.4e}")
+    log(f"Spearman No-overlap: rho={rho_no:.4f}, p={p_no:.4e}")
 
     corr_rows = [
         {"track": "G4_merged", "spearman_rho": rho_g4, "p_value": p_g4},
         {"track": "GC_bg", "spearman_rho": rho_gc, "p_value": p_gc},
+        {"track": "No_overlap", "spearman_rho": rho_no, "p_value": p_no},
     ]
     pd.DataFrame(corr_rows).to_csv(args.out_correlation_stats, sep="\t", index=False)
 
@@ -144,6 +153,8 @@ def main() -> None:
             color="#d62728", label=f"{args.g4_label} (ρ={rho_g4:.2f})")
     ax.plot(x, frac_df["gc_bg_overlap_fraction"].values * 100, "s--",
             color="#ff7f0e", label=f"GC-rich promoter BG (ρ={rho_gc:.2f})")
+    ax.plot(x, frac_df["no_overlap_fraction"].values * 100, "^-.",
+            color="#1f77b4", label=f"No_overlap (ρ={rho_no:.2f})")
 
     ax.axvline(0.5, color="gray", lw=0.8, ls=":")
     ax.set_xticks(range(0, 11))
@@ -151,7 +162,7 @@ def main() -> None:
     ax.set_xlabel("Expression decile (0 = silent)")
     ax.set_ylabel("Genes in set (%)")
     title_prefix = f"{args.analysis_label}: " if args.analysis_label else ""
-    ax.set_title(f"{title_prefix}G4 and GC-bg fraction across expression deciles")
+    ax.set_title(f"{title_prefix}G4, GC-bg, and No-overlap fraction across expression deciles")
     ax.grid(axis="y", color="#d9d9d9", lw=0.6)
     ax.legend(fontsize=9)
     plt.tight_layout()

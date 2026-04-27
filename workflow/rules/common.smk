@@ -31,6 +31,8 @@ def allInput():
     # smk: g4_tss (Tasks 1-8)
     inputList.append("results/g4_tss/tss_group_annotation.tsv")
     inputList.append("results/g4_tss/gene_expression_by_group.tsv")
+    inputList.append("results/g4_tss/group_gene_retention_summary.tsv")
+    inputList.append("results/g4_tss/group_gene_retention_barplot.pdf")
     inputList.append("results/g4_tss/expression_group_statistics.tsv")
     inputList.append("results/g4_tss/expression_violin_by_group.pdf")
     inputList.append("results/g4_tss/rnaseq_tss_metaprofile.pdf")
@@ -44,19 +46,36 @@ def allInput():
     inputList.append("results/g4_tss/pG4_pathway_enrichment.tsv")
     inputList.append("results/g4_tss/pG4_strength_stratification.tsv")
     inputList.append("results/g4_tss/pG4_strength_stratification.pdf")
+    inputList.append("results/g4_tss/pG4_strength_stratification_direction.pdf")
     inputList.append("results/g4_tss/pG4_enrichment_summary.tsv")
     inputList.append("results/g4_tss/pG4_sensitivity_qc.tsv")
+    inputList.append("results/g4_tss/uv_volcano_by_group_lrt_sig.pdf")
+    inputList.append("results/g4_tss/uv_fold_change_by_group_lrt_sig.pdf")
 
     # smk: g4_tss_atac_split
     for timepoint in config.get("g4_tss_atac_split", {}).get("timepoints", []):
         inputList.append(
-            f"results/g4_tss_atac_split/{timepoint}/g4_tss_atac_split_report.html"
-        )
+            f"results/g4_tss_atac_split/{timepoint}/g4_tss_atac_split_report.html")
+        inputList.append(
+            f"results/g4_tss_atac_split/{timepoint}/rnaseq_tss_metaprofile.pdf")
+        inputList.append(
+            f"results/g4_tss_atac_split/{timepoint}/structure_class_by_expression_class.pdf")
+        if not timepoint=="noUV":
+            inputList.append(
+                f"results/g4_tss_atac_split/{timepoint}/uv_fold_change_by_group_lrt_sig.pdf")
+            inputList.append(
+                f"results/g4_tss_atac_split/{timepoint}/uv_volcano_by_group_lrt_sig.pdf")
 
     # smk: g4_tss_uv (Tasks 1-7 — UV magnitude and direction analysis)
     inputList.append("results/g4_tss_uv/g4_uv_magnitude_direction_report.html")
 
     # smk: g4_tss_damage_uv (Tasks 1-7 — UV lesion burden and suppression analysis)
     inputList.append("results/g4_tss_damage_uv/g4_promoter_damage_suppression_report.html")
+
+    # smk: g4_tss (Task 12 — ATAC–RNA correlation by promoter group)
+    inputList.append("results/g4_tss_atac_rna_corr/atac_rna_corr_summary.tsv")
+    inputList.append("results/g4_tss_atac_rna_corr/scatter_atac_vs_rna_by_group_timepoint.pdf")
+    inputList.append("results/g4_tss_atac_rna_corr/rho_heatmap_group_timepoint.pdf")
+    inputList.append("results/g4_tss_atac_rna_corr/rho_over_time_by_group.pdf")
 
     return inputList

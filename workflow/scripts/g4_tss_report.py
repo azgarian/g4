@@ -148,6 +148,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--fc-stats", default=None)
     p.add_argument("--fc-plot", default=None)
     p.add_argument("--volcano-plot", default=None)
+    p.add_argument("--lrt-sig-fc-stats", default=None)
+    p.add_argument("--lrt-sig-fc-plot", default=None)
+    p.add_argument("--lrt-sig-volcano-plot", default=None)
     p.add_argument("--enrichment-stats", required=True)
     p.add_argument("--structure-plot", required=True)
     p.add_argument("--analysis-label", default=None)
@@ -177,6 +180,7 @@ def main() -> None:
     decile_corr = read_safe(args.decile_corr)
     lrt_summary = read_safe(args.lrt_summary)
     fc_stats = read_safe(args.fc_stats)
+    lrt_sig_fc_stats = read_safe(args.lrt_sig_fc_stats)
     enrichment = read_safe(args.enrichment_stats)
 
     group_size = anno["group"].value_counts().reset_index() if anno is not None else pd.DataFrame()
@@ -272,6 +276,28 @@ def main() -> None:
             )
         )
         section_index += 1
+
+        lrt_sig_available = (
+            lrt_sig_fc_stats is not None
+            and args.lrt_sig_fc_plot
+            and args.lrt_sig_volcano_plot
+        )
+        if lrt_sig_available:
+            sections.append(
+                render_section(
+                    f"{section_index}. UV fold change — LRT-significant genes ({args.uv_label})",
+                    f"{df_to_html(lrt_sig_fc_stats)}\n{render_figure(args.lrt_sig_fc_plot)}",
+                )
+            )
+            section_index += 1
+
+            sections.append(
+                render_section(
+                    f"{section_index}. UV volcano — LRT-significant genes ({args.uv_label})",
+                    render_figure(args.lrt_sig_volcano_plot),
+                )
+            )
+            section_index += 1
     else:
         sections.append(
             render_section(

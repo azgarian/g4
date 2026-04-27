@@ -153,6 +153,33 @@ rule g4_tss_baseline_expression:
         """
 
 
+# ─── Task 2b: Retained vs removed genes after RNA-seq prefilter ──────────────
+
+rule g4_tss_group_retention:
+    input:
+        annotation=rules.g4_tss_build_annotation.output.tsv,
+        by_group=rules.g4_tss_baseline_expression.output.by_group,
+    output:
+        summary="results/g4_tss/group_gene_retention_summary.tsv",
+        barplot="results/g4_tss/group_gene_retention_barplot.pdf",
+    log:
+        "logs/g4_tss/group_retention.log",
+    conda:
+        "../envs/g4_tss.yaml"
+    shell:
+        """
+        (echo "`date -R`: Summarizing retained vs removed genes by TSS group..." &&
+        python3 workflow/scripts/g4_tss_group_retention.py \
+          --tss-annotation {input.annotation} \
+          --gene-expression-by-group {input.by_group} \
+          --out-summary-tsv {output.summary} \
+          --out-barplot-pdf {output.barplot} \
+          --log {log} &&
+        echo "`date -R`: Success!" ||
+        {{ echo "`date -R`: Process failed..."; exit 1; }} ) > {log} 2>&1
+        """
+
+
 # ─── Task 3: Compare baseline expression across groups ────────────────────────
 
 rule g4_tss_expression_stats:
@@ -270,7 +297,7 @@ rule g4_tss_plot_profile:
           --yAxisLabel "Mean RPKM" \
           --refPointLabel "TSS" \
           --plotType lines \
-          --perGroup &&
+          --colors "#d62728" "#ff7f0e" "#1f77b4" &&
         echo "`date -R`: Success!" ||
         {{ echo "`date -R`: Process failed..."; exit 1; }} ) > {log} 2>&1
         """
@@ -323,6 +350,9 @@ rule g4_tss_uv_response:
         fc_stats="results/g4_tss/uv_group_fold_change_stats.tsv",
         fc_plot="results/g4_tss/uv_fold_change_by_group.pdf",
         volcano_plot="results/g4_tss/uv_volcano_by_group.pdf",
+        lrt_sig_fc_stats="results/g4_tss/uv_group_fold_change_stats_lrt_sig.tsv",
+        lrt_sig_fc_plot="results/g4_tss/uv_fold_change_by_group_lrt_sig.pdf",
+        lrt_sig_volcano_plot="results/g4_tss/uv_volcano_by_group_lrt_sig.pdf",
     log:
         "logs/g4_tss/uv_response.log",
     conda:
@@ -338,6 +368,9 @@ rule g4_tss_uv_response:
           --out-fc-stats {output.fc_stats} \
           --out-fc-plot {output.fc_plot} \
           --out-volcano-plot {output.volcano_plot} \
+          --out-lrt-sig-fc-stats {output.lrt_sig_fc_stats} \
+          --out-lrt-sig-fc-plot {output.lrt_sig_fc_plot} \
+          --out-lrt-sig-volcano-plot {output.lrt_sig_volcano_plot} \
           --log {log} &&
         echo "`date -R`: Success!" ||
         {{ echo "`date -R`: Process failed..."; exit 1; }} ) > {log} 2>&1
@@ -437,6 +470,7 @@ rule g4_tss_pg4_enrichment:
         enrichment_table="results/g4_tss/pG4_pathway_enrichment.tsv",
         g4_strength_table="results/g4_tss/pG4_strength_stratification.tsv",
         g4_strength_plot="results/g4_tss/pG4_strength_stratification.pdf",
+        g4_strength_direction_plot="results/g4_tss/pG4_strength_stratification_direction.pdf",
         summary="results/g4_tss/pG4_enrichment_summary.tsv",
     log:
         "logs/g4_tss/pg4_enrichment.log",
@@ -463,6 +497,7 @@ rule g4_tss_pg4_enrichment:
           --out-enrichment-table {output.enrichment_table} \
           --out-g4-strength-table {output.g4_strength_table} \
           --out-g4-strength-plot {output.g4_strength_plot} \
+          --out-g4-strength-direction-plot {output.g4_strength_direction_plot} \
           --out-summary {output.summary} \
           --log {log} &&
         echo "`date -R`: Success!" ||
@@ -512,6 +547,9 @@ rule g4_tss_report:
         fc_stats=rules.g4_tss_uv_response.output.fc_stats,
         fc_plot=rules.g4_tss_uv_response.output.fc_plot,
         volcano=rules.g4_tss_uv_response.output.volcano_plot,
+        lrt_sig_fc_stats=rules.g4_tss_uv_response.output.lrt_sig_fc_stats,
+        lrt_sig_fc_plot=rules.g4_tss_uv_response.output.lrt_sig_fc_plot,
+        lrt_sig_volcano=rules.g4_tss_uv_response.output.lrt_sig_volcano_plot,
         enrichment_stats=rules.g4_tss_structure_enrichment.output.enrichment_stats,
         struct_plot=rules.g4_tss_structure_enrichment.output.struct_plot,
     output:
@@ -538,10 +576,67 @@ rule g4_tss_report:
           --fc-stats {input.fc_stats} \
           --fc-plot {input.fc_plot} \
           --volcano-plot {input.volcano} \
+          --lrt-sig-fc-stats {input.lrt_sig_fc_stats} \
+          --lrt-sig-fc-plot {input.lrt_sig_fc_plot} \
+          --lrt-sig-volcano-plot {input.lrt_sig_volcano} \
           --enrichment-stats {input.enrichment_stats} \
           --structure-plot {input.struct_plot} \
           --out-html {output.html} \
           --out-versions {output.versions} &&
+        echo "`date -R`: Success!" ||
+        {{ echo "`date -R`: Process failed..."; exit 1; }} ) > {log} 2>&1
+        """
+
+
+# ─── Task 12: ATAC–RNA correlation by promoter group across UV time-course ────
+
+rule g4_tss_atac_rna_corr:
+    input:
+        annotation=rules.g4_tss_build_annotation.output.tsv,
+        windows=rules.g4_tss_slop_windows.output.windows,
+        norm_counts="results/rnaseq/matrices/normalized_counts.tsv.gz",
+        bw_t00="resources/rna-seq/merged_t00.bw",
+        bw_t12="resources/rna-seq/merged_t12.bw",
+        bw_t30="resources/rna-seq/merged_t30.bw",
+        bw_t60="resources/rna-seq/merged_t60.bw",
+    output:
+        atac_signal="results/g4_tss_atac_rna_corr/atac_promoter_signal.tsv",
+        rna_expression="results/g4_tss_atac_rna_corr/rna_expression_by_timepoint.tsv",
+        merged="results/g4_tss_atac_rna_corr/merged_atac_rna_by_group.tsv",
+        silent_genes="results/g4_tss_atac_rna_corr/silent_genes.tsv",
+        spearman="results/g4_tss_atac_rna_corr/atac_rna_spearman_by_group_timepoint.tsv",
+        permutation="results/g4_tss_atac_rna_corr/group_correlation_permutation_tests.tsv",
+        summary="results/g4_tss_atac_rna_corr/atac_rna_corr_summary.tsv",
+        scatter_pdf="results/g4_tss_atac_rna_corr/scatter_atac_vs_rna_by_group_timepoint.pdf",
+        heatmap_pdf="results/g4_tss_atac_rna_corr/rho_heatmap_group_timepoint.pdf",
+        lineplot_pdf="results/g4_tss_atac_rna_corr/rho_over_time_by_group.pdf",
+    log:
+        "logs/g4_tss_atac_rna_corr/atac_rna_corr.log",
+    conda:
+        "../envs/g4_tss.yaml"
+    shell:
+        """
+        (echo "`date -R`: Correlating promoter ATAC signal with RNA-seq expression..." &&
+        mkdir -p results/g4_tss_atac_rna_corr logs/g4_tss_atac_rna_corr &&
+        python3 workflow/scripts/g4_tss_atac_rna_corr.py \
+          --tss-annotation {input.annotation} \
+          --promoter-windows-bed {input.windows} \
+          --norm-counts {input.norm_counts} \
+          --bw-t00 {input.bw_t00} \
+          --bw-t12 {input.bw_t12} \
+          --bw-t30 {input.bw_t30} \
+          --bw-t60 {input.bw_t60} \
+          --out-atac-signal {output.atac_signal} \
+          --out-rna-expression {output.rna_expression} \
+          --out-merged {output.merged} \
+          --out-silent-genes {output.silent_genes} \
+          --out-spearman {output.spearman} \
+          --out-permutation {output.permutation} \
+          --out-summary {output.summary} \
+          --out-scatter-pdf {output.scatter_pdf} \
+          --out-heatmap-pdf {output.heatmap_pdf} \
+          --out-lineplot-pdf {output.lineplot_pdf} \
+          --log {log} &&
         echo "`date -R`: Success!" ||
         {{ echo "`date -R`: Process failed..."; exit 1; }} ) > {log} 2>&1
         """

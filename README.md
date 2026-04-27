@@ -241,6 +241,8 @@ Top-level RNA-seq outputs:
   - `baseline_tpm_summary.tsv`
   - `baseline_normalized_counts.tsv`
   - `gene_expression_by_group.tsv`
+  - `group_gene_retention_summary.tsv`
+  - `group_gene_retention_barplot.pdf`
 - statistics and visualizations:
   - `expression_group_statistics.tsv`
   - `expression_group_fisher.tsv`

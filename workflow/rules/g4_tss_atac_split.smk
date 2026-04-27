@@ -306,7 +306,7 @@ rule g4_tss_atac_split_plot_profile:
           --yAxisLabel "Mean RPKM" \
           --refPointLabel "TSS" \
           --plotType lines \
-          --perGroup &&
+          --colors "#d62728" "#ff7f0e" "#1f77b4" &&
         echo "`date -R`: Success!" ||
         {{ echo "`date -R`: Process failed..."; exit 1; }} ) > {log} 2>&1
         """
@@ -361,6 +361,9 @@ rule g4_tss_atac_split_uv_response:
         fc_stats="results/g4_tss_atac_split/{timepoint}/uv_group_fold_change_stats.tsv",
         fc_plot="results/g4_tss_atac_split/{timepoint}/uv_fold_change_by_group.pdf",
         volcano_plot="results/g4_tss_atac_split/{timepoint}/uv_volcano_by_group.pdf",
+        lrt_sig_fc_stats="results/g4_tss_atac_split/{timepoint}/uv_group_fold_change_stats_lrt_sig.tsv",
+        lrt_sig_fc_plot="results/g4_tss_atac_split/{timepoint}/uv_fold_change_by_group_lrt_sig.pdf",
+        lrt_sig_volcano_plot="results/g4_tss_atac_split/{timepoint}/uv_volcano_by_group_lrt_sig.pdf",
     log:
         "logs/g4_tss_atac_split/{timepoint}/uv_response.log",
     conda:
@@ -381,6 +384,9 @@ rule g4_tss_atac_split_uv_response:
           --out-fc-stats {output.fc_stats} \
           --out-fc-plot {output.fc_plot} \
           --out-volcano-plot {output.volcano_plot} \
+          --out-lrt-sig-fc-stats {output.lrt_sig_fc_stats} \
+          --out-lrt-sig-fc-plot {output.lrt_sig_fc_plot} \
+          --out-lrt-sig-volcano-plot {output.lrt_sig_volcano_plot} \
           --log {log} &&
         echo "`date -R`: Success!" ||
         {{ echo "`date -R`: Process failed..."; exit 1; }} ) > {log} 2>&1

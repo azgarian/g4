@@ -58,6 +58,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--out-enrichment-table", required=True)
     p.add_argument("--out-g4-strength-table", required=True)
     p.add_argument("--out-g4-strength-plot", required=True)
+    p.add_argument("--out-g4-strength-direction-plot", required=True)
     p.add_argument("--out-summary", required=True)
     p.add_argument("--log", default=None)
     return p.parse_args()
@@ -490,6 +491,71 @@ def plot_g4_strength(
     plt.close(fig)
 
 
+def plot_g4_strength_direction(
+    g4_sub: pd.DataFrame,
+    out_path: str,
+    strength_metric: str,
+) -> None:
+    """Violin plots of log2FC stratified by G4 strength, split by direction.
+
+    Left panel: increased genes (lfc_0_vs_60 > 0), actual positive values.
+    Right panel: decreased genes (lfc_0_vs_60 < 0), actual negative values.
+    """
+    bins = sorted(b for b in g4_sub["g4_strength_bin"].unique() if b != "Q0_noPeaks")
+    fc_col = "lfc_0_vs_60"
+    metric_label = strength_metric_label(strength_metric)
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+
+    if fc_col not in g4_sub.columns:
+        for ax in axes:
+            ax.text(0.5, 0.5, f"{fc_col} not available",
+                    ha="center", va="center", transform=ax.transAxes)
+        plt.tight_layout()
+        fig.savefig(out_path, dpi=150)
+        plt.close(fig)
+        return
+
+    panels = [
+        (axes[0], g4_sub[g4_sub[fc_col] > 0], "Increased", "#d62728"),
+        (axes[1], g4_sub[g4_sub[fc_col] < 0], "Decreased", "#1f77b4"),
+    ]
+
+    positions = list(range(1, len(bins) + 1))
+    for ax, subset, direction, color in panels:
+        plot_data = [
+            subset.loc[subset["g4_strength_bin"] == b, fc_col].dropna().values
+            for b in bins
+        ]
+        valid = [(p, d) for p, d in zip(positions, plot_data) if len(d) > 0]
+        if valid:
+            parts = ax.violinplot(
+                [d for _, d in valid],
+                positions=[p for p, _ in valid],
+                showmedians=True,
+            )
+            for pc in parts.get("bodies", []):
+                pc.set_facecolor(color)
+                pc.set_alpha(0.7)
+            for partname in ("cmedians", "cbars", "cmins", "cmaxes"):
+                if partname in parts:
+                    parts[partname].set_edgecolor("black")
+                    parts[partname].set_linewidth(0.8)
+        ax.axhline(0, color="black", linewidth=0.5, linestyle="--")
+        ax.set_xticks(positions)
+        ax.set_xticklabels(bins)
+        ax.set_xlabel(f"G4-strength bin (by {metric_label})")
+        ax.set_ylabel("log₂FC (0 vs 60 min)")
+        ax.set_title(f"{direction} genes: log₂FC vs G4 strength")
+        for pos, dat in zip(positions, plot_data):
+            ymin = ax.get_ylim()[0]
+            ax.text(pos, ymin, f"n={len(dat)}", ha="center", va="bottom", fontsize=7)
+
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -504,6 +570,7 @@ def main() -> None:
         args.out_enrichment_table,
         args.out_g4_strength_table,
         args.out_g4_strength_plot,
+        args.out_g4_strength_direction_plot,
         args.out_summary,
     ):
         Path(outpath).parent.mkdir(parents=True, exist_ok=True)
@@ -586,6 +653,13 @@ def main() -> None:
         args.strength_metric,
     )
     log(f"Written: {args.out_g4_strength_plot}")
+
+    plot_g4_strength_direction(
+        g4_binned,
+        args.out_g4_strength_direction_plot,
+        args.strength_metric,
+    )
+    log(f"Written: {args.out_g4_strength_direction_plot}")
 
     # ── summary table ──────────────────────────────────────────────────────────
     summary_rows = []

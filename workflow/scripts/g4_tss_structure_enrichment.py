@@ -21,6 +21,25 @@ from scipy import stats
 from statsmodels.stats.multitest import multipletests
 
 
+CLASS_ORDER = ["silent", "Q1", "Q2", "Q3", "Q4"]
+STRUCTURE_PLOT_ORDER = [
+    "loop1_3",
+    "loop4_5",
+    "loop6_7",
+    "longLoop",
+    "simpleBulge",
+    "complexBulge",
+    "twoTetrads",
+]
+EXPRESSION_CLASS_COLORS = {
+    "silent": "#bdbdbd",
+    "Q1": "#bde2ee",
+    "Q2": "#fdbf71",
+    "Q3": "#f46d43",
+    "Q4": "#a50026",
+}
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--tss-annotation", required=True)
@@ -116,6 +135,13 @@ def intersect_structures_full(windows_bed: str, struct_tsv: str) -> pd.DataFrame
     return pd.DataFrame(rows)
 
 
+def order_structures(structures: list[str]) -> list[str]:
+    """Return the requested plot order, then append any unexpected classes."""
+    preferred = [name for name in STRUCTURE_PLOT_ORDER if name in structures]
+    remaining = sorted(name for name in structures if name not in STRUCTURE_PLOT_ORDER and name != "other")
+    return preferred + remaining
+
+
 def main() -> None:
     args = parse_args()
     log_fh = open(args.log, "w") if args.log else None
@@ -164,13 +190,13 @@ def main() -> None:
     )
 
     # per structure class × expression class counts
-    CLASS_ORDER = ["silent", "Q1", "Q2", "Q3", "Q4"]
     structure_classes = [s for s in merged["structure"].dropna().unique() if s != "other"]
+    ordered_structure_classes = order_structures(structure_classes)
     g4_tpm = tpm_sub[tpm_sub["gene_id"].isin(g4_genes)].copy()
     totals_by_class = g4_tpm["expression_class"].value_counts().to_dict()
 
     rows = []
-    for struct in sorted(structure_classes):
+    for struct in ordered_structure_classes:
         sub = merged[merged["structure"] == struct]
         for cls in CLASS_ORDER:
             n_genes = (sub["expression_class"] == cls).sum()
@@ -194,7 +220,7 @@ def main() -> None:
     n_q1 = (all_g4_tss["expression_class"] == "Q1").sum()
     n_sil = (all_g4_tss["expression_class"] == "silent").sum()
 
-    for struct in sorted(structure_classes):
+    for struct in ordered_structure_classes:
         sub = merged[merged["structure"] == struct]
         genes_with_struct = set(sub["gene_id_norm"].dropna().unique())
 
@@ -237,18 +263,26 @@ def main() -> None:
     # --- Stacked bar chart ---
     plot_class_order = [cls for cls in CLASS_ORDER if cls != "silent"]
     pivot = struct_df.pivot(index="structure", columns="expression_class",
-                            values="fraction_in_class").reindex(columns=plot_class_order)
+                            values="fraction_in_class").reindex(
+        index=ordered_structure_classes,
+        columns=plot_class_order,
+    )
     if pivot.empty:
         log("No structure data to plot.")
     else:
-        fig, ax = plt.subplots(figsize=(max(6, len(structure_classes) * 0.8 + 2), 4.5))
-        pivot.plot(kind="bar", ax=ax, colormap="RdYlBu_r", width=0.75)
+        fig, ax = plt.subplots(figsize=(max(6, len(ordered_structure_classes) * 0.8 + 2), 4.5))
+        pivot.plot(
+            kind="bar",
+            ax=ax,
+            color=[EXPRESSION_CLASS_COLORS[cls] for cls in plot_class_order],
+            width=0.75,
+        )
         ax.set_xlabel("G4 structure class")
         ax.set_ylabel("Fraction of G4_TSS genes in class")
         title_prefix = f"{args.analysis_label}: " if args.analysis_label else ""
         ax.set_title(f"{title_prefix}G4 structure class distribution across expression classes")
         ax.legend(title="Expression class", bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=8)
-        plt.xticks(rotation=45, ha="right", fontsize=8)
+        plt.xticks(rotation=0, ha="center", fontsize=8)
         plt.tight_layout()
         fig.savefig(args.out_plot, dpi=150)
         plt.close(fig)

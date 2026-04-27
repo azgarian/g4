@@ -33,6 +33,7 @@ GROUP_PALETTE = {
 }
 TIMEPOINTS = ["12", "30", "60"]
 LRT_PADJ_THRESH = 0.05
+DENSITY_XLIM = (-5, 5)
 DIRECTION_COLORS = {"repressed": "#d62728", "induced": "#2ca02c", "not_sig": "#aec7e8"}
 
 
@@ -201,6 +202,7 @@ def main() -> None:
             plotted = True
         for xval in [0, 0.5, -0.5, 1, -1]:
             ax.axvline(xval, color="gray", lw=0.7, ls="--" if xval != 0 else "-", alpha=0.6)
+        ax.set_xlim(*DENSITY_XLIM)
         ax.set_xlabel("log₂FC")
         ax.set_ylabel("Density")
         ax.set_title(f"{tp} min post-UV")
